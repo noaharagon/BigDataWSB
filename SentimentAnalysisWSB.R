@@ -6,6 +6,7 @@
 library(data.table)
 library(dplyr)
 library(anytime)
+library(tibble)
 
 #setting working directory
 Paths = c("/Users/jonasschmitten/Desktop/FS 2021/Big Data Analytics/Sentiment Analysis WSB", 
