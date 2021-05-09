@@ -8,14 +8,18 @@ library(dplyr)
 library(anytime)
 library(tibble)
 library(tidyverse)
+library(vader)
 
 #setting working directory
 Paths = c("/Users/jonasschmitten/Desktop/FS 2021/Big Data Analytics/Sentiment Analysis WSB", 
           "/Users/noahangara/Downloads")
 Paths = c("/Users/jonasschmitten/Downloads/Sentiment Analysis WSB", 
-          "/Users/noahangara/Documents/Master's/8th Semester/Economics in Practice")
+          "/Users/noahangara/Downloads")
 names(Paths) = c("jonasschmitten", "noahangara")
 setwd(Paths[Sys.info()[7]])
+#download "source package" of vader under https://cran.r-project.org/web/packages/vader/index.html
+#make sure you put the source file into the same working directory
+load("vader/R/sysdata.rda")
 
 #partially reading in data 
 data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
@@ -44,6 +48,41 @@ data = select(data,-created_utc)
 
 #Not as date type yet
 typeof(data$Date)
+
+
+# Adding Words to Vader Dictionary ----------------------------------------
+
+# let's add some words to the dictionary that are specific to WSB
+wsbLexicon <- bind_rows(tibble(V1 = c("retard", "retarded", "fuck", "fucking", "autist", "fag", "gay", "stonk", "porn", 
+                                      "degenerate", "boomer", "ape", "gorilla"), V2 = 0, V3 = 0.5), # neutral 
+                        tibble(V1 = c("bull", "bullish", "tendie", "tendies", "call", "long", "buy", "moon", "hold",# positive
+                                      "diamond", "hands", "yolo", "yoloed", "free", "btfd", "rocket", "elon", "gain",
+                                      "420", "calls", "longs", "sky", "space", "roof", "squeeze", "balls", "JPOW", "printer",
+                                      "brrr", "HODL", "daddy", "BTFD", "squoze", "full moon", "full moon face", "ox", "astronaut",
+                                      "man astronaut", "gem stone", "money bag"), V2 = 1.5, V3 = 0.5),                     
+                        tibble(V1 = c("bear", "sell", "put", "short", "shorts", "puts", "bagholder", "wife", "boyfriend",# negative
+                                      "shorting", "citron", "hedge", "fake", "virgin", "cuck", "guh", "paper", "SEC", "drilling",
+                                      "bear face", "briefcase", "roll of paper"), V2 = -1.5, V3 = 0.5))
+
+# add back to lexicon
+vaderLexiconWSB <- vaderLexicon %>% 
+  as_tibble() %>% 
+  # anti_join(wsbLexicon, by = "V1") %>% 
+  filter(!(V1 %in% wsbLexicon$V1)) %>% 
+  bind_rows(wsbLexicon) %>% 
+  as.data.frame()
+# change lexicon to include new words
+vaderLexicon <- vaderLexiconWSB
+
+save(vaderLexicon, file ="vader/R/sysdata.rda")
+
+# remove the vader package and reinstall
+detach("package:vader", unload = T)
+remove.packages("vader")
+#install package which contains the new words
+install.packages("vader/", repos = NULL, type = "source")
+#load the new package
+library(vader)
 
 #TEXT NORMALISATION -----------------------------------------------------------------------------------------
 #data$body = toupper(data$body)
