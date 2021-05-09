@@ -9,9 +9,10 @@ library(anytime)
 library(tibble)
 library(tidyverse)
 library(vader)
+library(chron)
 
 #setting working directory
-Paths = c("/Users/jonasschmitten/Downloads/Sentiment Analysis WSB", 
+Paths = c("/Users/jonasschmitten/Downloads/Sentiment_Analysis_WSB", 
           "/Users/noahangara/Downloads")
 names(Paths) = c("jonasschmitten", "noahangara")
 setwd(Paths[Sys.info()[7]])
@@ -23,6 +24,8 @@ load("vader/R/sysdata.rda")
 
 #partially reading in data 
 data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 100000))
+#alternative? to check if fread skips rows
+data = read.csv("wsb_comments_raw.csv",nrows=100000)
 #remove all columns where only NAs
 data = data[,colSums(is.na(data))<nrow(data)]
 
@@ -39,6 +42,14 @@ data = select(data, -c(author_flair_background_color, author_flair_css_class,aut
 #convert UNIX to UTC
 data$created_utc = anytime::utctime(data$created_utc)
 
+
+as.POSIXct(data$created_utc, origin="1970-01-01")
+library(R.utils)
+
+countLines('wsb_comments_raw.csv')
+
+
+
 #create date and time columns 
 data = add_column(data, Date = substr(data$created_utc, 1, 10),.before = 1)
 data = add_column(data, Time = substr(data$created_utc, 12, 20),.after = 1)
@@ -46,10 +57,14 @@ data = add_column(data, Time = substr(data$created_utc, 12, 20),.after = 1)
 #drop no longer needed column
 data = select(data,-created_utc)
 
-#Not as date type yet
-typeof(data$Date)
+#change date and time formats
+data$Date = as.Date(data$Date)
+data$Time = times(data$Time)
 
+data = data[order(data$Date, data$Time),]
 
+#reset index after odering 
+row.names(data) <- NULL
 # Adding Words to Vader Dictionary ----------------------------------------
 
 # let's add some words to the dictionary that are specific to WSB
@@ -97,18 +112,21 @@ reg_expression <- regex(paste0("\\b(?:",
                                ")\\b"))
 reddit_mentions <- data %>%
   mutate(stock_mention = str_extract_all(body, reg_expression)) %>%
-  unnest(stock_mention)
+  unnest(cols = stock_mention)
 
 reddit_mention_counts <- reddit_mentions %>% 
   group_by(Date, stock_mention) %>% 
   count()
+
+X = group_by(reddit_mentions$Date,reddit_mentions$stock_mention)
+
 
 # false positives (non-stock related):
 for (i in LETTERS){
   print(stock_tickers%>%filter(stock_tickers$Symbol == i))
   }
 
-fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", LETTERS)
+fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "ATH", LETTERS)
 
 top5 <- reddit_mention_counts %>% 
   group_by(stock_mention) %>% 
@@ -121,7 +139,7 @@ top5 <- reddit_mention_counts %>%
 
 reddit_mention_counts %>% 
   filter(stock_mention %in% top5) %>% 
-  ggplot(aes(x = Date, y = n, color = stock_mention)) + geom_line() + theme_classic()
+  ggplot(aes(x = Date, y = n, color = stock_mention)) + geom_line() #+ theme_classic()
 
 reddit_mentions %>% 
   filter(!(stock_mention %in% fp)) %>% 
