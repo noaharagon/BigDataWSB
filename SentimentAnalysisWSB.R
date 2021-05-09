@@ -17,8 +17,10 @@ Paths = c("/Users/jonasschmitten/Downloads/Sentiment Analysis WSB",
           "/Users/noahangara/Downloads")
 names(Paths) = c("jonasschmitten", "noahangara")
 setwd(Paths[Sys.info()[7]])
+
 #download "source package" of vader under https://cran.r-project.org/web/packages/vader/index.html
 #make sure you put the source file into the same working directory
+
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
@@ -87,26 +89,48 @@ library(vader)
 #TEXT NORMALISATION -----------------------------------------------------------------------------------------
 #data$body = toupper(data$body)
 
-data[1,'body']
 
 #Get all stock tickers traded in the US
 stock_tickers = read.csv("stock_tickers.csv")
-stock_tickers = as.data.frame(stock_tickers$Symbol)
-
 
 #CHECK WHICH STOCKS HAVE TICKERS SAME AS LETTERS AND IF RELEVANT TO KEEP
+reg_expression <- regex(paste0("\\b(?:",
+                               paste(stock_tickers$Symbol, collapse = "|"),
+                               ")\\b"))
+reddit_mentions <- data %>%
+  mutate(stock_mention = str_extract_all(body, reg_expression)) %>%
+  unnest(stock_mention)
+
+reddit_mention_counts <- reddit_mentions %>% 
+  group_by(Date, stock_mention) %>% 
+  count()
+
+# false positives (non-stock related):
 for (i in LETTERS){
-  print(stock_tickers %>% 
-    filter(Symbol == i)  )
-}
+  print(stock_tickers%>%filter(stock_tickers$Symbol == i))
+  }
 
+fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", LETTERS)
 
-for (i in which(stock_tickers[,1] %in% data[,'body'])){
-  print(data[i,'body'])
-}
+top5 <- reddit_mention_counts %>% 
+  group_by(stock_mention) %>% 
+  summarise(n = sum(n)) %>% 
+  ungroup() %>% 
+  arrange(-n) %>%
+  filter(!(stock_mention %in% fp)) %>% 
+  head(5) %>% 
+  pull(stock_mention)
 
-data[678,'body']
+reddit_mention_counts %>% 
+  filter(stock_mention %in% top5) %>% 
+  ggplot(aes(x = Date, y = n, color = stock_mention)) + geom_line() + theme_classic()
 
-which(stock_tickers[,1] %in% data[,'body'])
+reddit_mentions %>% 
+  filter(!(stock_mention %in% fp)) %>% 
+  group_by(stock_mention) %>% 
+  count() %>% 
+  arrange(-n) %>% 
+  print(n = 20)
 
-any(data$body == "the")
+reddit_mentions %>% 
+  filter(!(stock_mention %in% fp))
