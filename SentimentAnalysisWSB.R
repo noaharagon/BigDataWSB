@@ -11,8 +11,6 @@ library(tidyverse)
 library(vader)
 
 #setting working directory
-Paths = c("/Users/jonasschmitten/Desktop/FS 2021/Big Data Analytics/Sentiment Analysis WSB", 
-          "/Users/noahangara/Downloads")
 Paths = c("/Users/jonasschmitten/Downloads/Sentiment Analysis WSB", 
           "/Users/noahangara/Downloads")
 names(Paths) = c("jonasschmitten", "noahangara")
@@ -24,7 +22,7 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 100000))
 #remove all columns where only NAs
 data = data[,colSums(is.na(data))<nrow(data)]
 
