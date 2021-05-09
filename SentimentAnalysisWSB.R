@@ -7,10 +7,13 @@ library(data.table)
 library(dplyr)
 library(anytime)
 library(tibble)
+library(tidyverse)
 
 #setting working directory
 Paths = c("/Users/jonasschmitten/Desktop/FS 2021/Big Data Analytics/Sentiment Analysis WSB", 
           "/Users/noahangara/Downloads")
+Paths = c("/Users/jonasschmitten/Downloads/Sentiment Analysis WSB", 
+          "/Users/noahangara/Documents/Master's/8th Semester/Economics in Practice")
 names(Paths) = c("jonasschmitten", "noahangara")
 setwd(Paths[Sys.info()[7]])
 
@@ -41,3 +44,30 @@ data = select(data,-created_utc)
 
 #Not as date type yet
 typeof(data$Date)
+
+#TEXT NORMALISATION -----------------------------------------------------------------------------------------
+#data$body = toupper(data$body)
+
+data[1,'body']
+
+#Get all stock tickers traded in the US
+stock_tickers = read.csv("stock_tickers.csv")
+stock_tickers = as.data.frame(stock_tickers$Symbol)
+
+
+#CHECK WHICH STOCKS HAVE TICKERS SAME AS LETTERS AND IF RELEVANT TO KEEP
+for (i in LETTERS){
+  print(stock_tickers %>% 
+    filter(Symbol == i)  )
+}
+
+
+for (i in which(stock_tickers[,1] %in% data[,'body'])){
+  print(data[i,'body'])
+}
+
+data[678,'body']
+
+which(stock_tickers[,1] %in% data[,'body'])
+
+any(data$body == "the")
