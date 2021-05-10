@@ -47,17 +47,14 @@ data = data[order(data$created_utc),]
 #reset index after odering 
 row.names(data) <- NULL
 
-data$dates = anytime::utctime(data$created_utc)
+data$created_utc = anytime::utctime(data$created_utc)
 
-
-as.POSIXct(data$created_utc, origin="1970-01-01")
-library(R.utils)
 
 #countLines('wsb_comments_raw.csv')
 
 #create date and time columns 
 data = add_column(data, Date = substr(data$created_utc, 1, 10),.before = 1)
-data = add_column(data, Time = substr(data$created_utc, 12, 20),.after = 1)
+data = add_column(data, Time = substr(data$created_utc, 12, 19),.after = 1)
 
 #drop no longer needed column
 #data = select(data,-created_utc)
@@ -124,7 +121,7 @@ reddit_mentions <- data %>%
 reddit_mention_counts <- reddit_mentions %>% 
   group_by(Date, stock_mention) %>% 
   count()
-reddit_mention_counts$Month = format(as.Date(reddit_sentiment_counts$Date), "%Y-%m")
+reddit_mention_counts$Month = format(as.Date(reddit_mention_counts$Date), "%Y-%m")
 
 
 # false positives (non-stock related):
@@ -139,6 +136,7 @@ fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "
 test = reddit_mention_counts %>%
   group_by(Month, stock_mention) %>%
   summarise(n = sum(n)) %>%
+  filter(!(stock_mention %in% fp)) %>% 
   top_n(5)
 
 #get top 5 stocks mentioned in the data
