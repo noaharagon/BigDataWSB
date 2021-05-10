@@ -108,6 +108,8 @@ stock_tickers = read.csv("stock_tickers.csv")
 reg_expression <- regex(paste0("\\b(?:",
                                paste(stock_tickers$Symbol, collapse = "|"),
                                ")\\b"))
+#paste(paste(stock_tickers$Symbol, collapse = "|"), paste(word(stock_tickers$Name), collapse = "|"), collapes = "|")
+
 reddit_mentions <- data %>%
   mutate(stock_mention = str_extract_all(body, reg_expression)) %>%
   unnest(cols = stock_mention)
