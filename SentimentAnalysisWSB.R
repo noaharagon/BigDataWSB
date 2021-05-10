@@ -62,7 +62,7 @@ data$Time = times(data$Time)
 
 data = data[order(data$Date, data$Time),]
 
-#reset index after odering 
+#reset index after ordering 
 row.names(data) <- NULL
 # Adding Words to Vader Dictionary ----------------------------------------
 
