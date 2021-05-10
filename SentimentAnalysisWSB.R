@@ -119,15 +119,14 @@ reddit_mention_counts <- reddit_mentions %>%
   group_by(Date, stock_mention) %>% 
   count()
 
-X = group_by(reddit_mentions$Date,reddit_mentions$stock_mention)
-
 
 # false positives (non-stock related):
 for (i in LETTERS){
   print(stock_tickers%>%filter(stock_tickers$Symbol == i))
   }
 
-fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "ATH", LETTERS)
+fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "ATH",
+        "IQ", LETTERS)
 
 #get top 5 stocks mentioned in the data
 top5 <- reddit_mention_counts %>% 
@@ -177,9 +176,7 @@ reddit_sentiment_counts <- reddit_mentions_sentiment %>%
 reddit_sentiment_counts %>% 
   filter(stock_mention %in% top5) %>% 
   ggplot(aes(x = Date, y = sentiment, color = stock_mention)) +
-  geom_smooth(se = F) +
-  theme_classic()
-
+  geom_smooth(se = F)
 
 
 #Getting stock prices based on most mentioned stocks
@@ -192,7 +189,9 @@ colnames(stock_prices) = top5
 #Remove unnecessary variables 
 for (i in 1:length(top5)){
   rm(list = top5[i])
-  }
+}
+
+
 
 
 
