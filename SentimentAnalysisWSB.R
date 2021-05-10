@@ -118,6 +118,7 @@ reddit_mentions <- data %>%
 reddit_mention_counts <- reddit_mentions %>% 
   group_by(Date, stock_mention) %>% 
   count()
+reddit_mention_counts$Month = format(as.Date(reddit_sentiment_counts$Date), "%Y-%m")
 
 
 # false positives (non-stock related):
@@ -127,6 +128,12 @@ for (i in LETTERS){
 
 fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "ATH",
         "IQ", LETTERS)
+
+#return the 5 most mentioned stocks by month
+test = reddit_mention_counts %>%
+  group_by(Month, stock_mention) %>%
+  summarise(n = sum(n)) %>%
+  top_n(5)
 
 #get top 5 stocks mentioned in the data
 top5 <- reddit_mention_counts %>% 
@@ -171,6 +178,7 @@ reddit_sentiment_counts <- reddit_mentions_sentiment %>%
   group_by(Date, stock_mention) %>% 
   summarise(sentiment = mean(sentiment),
             n = n())
+
 
 #plot sentiment over time
 reddit_sentiment_counts %>% 
