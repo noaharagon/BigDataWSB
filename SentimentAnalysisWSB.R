@@ -23,9 +23,9 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 100000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
 #alternative? to check if fread skips rows
-data = read.csv("wsb_comments_raw.csv",nrows=100000)
+#data = read.csv("wsb_comments_raw.csv",nrows=10000)
 #remove all columns where only NAs
 data = data[,colSums(is.na(data))<nrow(data)]
 
@@ -46,16 +46,14 @@ data$created_utc = anytime::utctime(data$created_utc)
 as.POSIXct(data$created_utc, origin="1970-01-01")
 library(R.utils)
 
-countLines('wsb_comments_raw.csv')
-
-
+#countLines('wsb_comments_raw.csv')
 
 #create date and time columns 
 data = add_column(data, Date = substr(data$created_utc, 1, 10),.before = 1)
 data = add_column(data, Time = substr(data$created_utc, 12, 20),.after = 1)
 
 #drop no longer needed column
-data = select(data,-created_utc)
+#data = select(data,-created_utc)
 
 #change date and time formats
 data$Date = as.Date(data$Date)
@@ -128,6 +126,7 @@ for (i in LETTERS){
 
 fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "ATH", LETTERS)
 
+#get top 5 stocks mentioned in the data
 top5 <- reddit_mention_counts %>% 
   group_by(stock_mention) %>% 
   summarise(n = sum(n)) %>% 
@@ -137,9 +136,11 @@ top5 <- reddit_mention_counts %>%
   head(5) %>% 
   pull(stock_mention)
 
+#plot mentions of top5 stocks 
 reddit_mention_counts %>% 
   filter(stock_mention %in% top5) %>% 
   ggplot(aes(x = Date, y = n, color = stock_mention)) + geom_line() #+ theme_classic()
+
 
 reddit_mentions %>% 
   filter(!(stock_mention %in% fp)) %>% 
@@ -150,3 +151,26 @@ reddit_mentions %>%
 
 reddit_mentions %>% 
   filter(!(stock_mention %in% fp))
+
+comments_sentiment = reddit_mentions %>%
+  select(body) %>%
+  distinct() %>%
+  mutate(comment_clean = str_replace_all(body, "\\\\", " ")) %>%
+  mutate(sentiment = vader_df(comment_clean)$compound)
+
+reddit_mentions_sentiment <- reddit_mentions %>% 
+  left_join(comments_sentiment %>% select(-comment_clean),
+            by = "body")
+
+reddit_sentiment_counts <- reddit_mentions_sentiment %>% 
+  group_by(Date, stock_mention) %>% 
+  summarise(sentiment = mean(sentiment),
+            n = n())
+
+reddit_sentiment_counts %>% 
+  filter(stock_mention %in% top5) %>% 
+  ggplot(aes(x = Date, y = sentiment, color = stock_mention)) +
+  geom_smooth(se = F) +
+  theme_classic()
+
+
