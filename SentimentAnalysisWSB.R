@@ -24,7 +24,7 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 100000))
 #alternative? to check if fread skips rows
 #data = read.csv("wsb_comments_raw.csv",nrows=10000)
 #remove all columns where only NAs
@@ -41,7 +41,13 @@ data = select(data, -c(author_flair_background_color, author_flair_css_class,aut
 #not sure about distinguished
 
 #convert UNIX to UTC
-data$created_utc = anytime::utctime(data$created_utc)
+
+data = data[order(data$created_utc),]
+
+#reset index after odering 
+row.names(data) <- NULL
+
+data$dates = anytime::utctime(data$created_utc)
 
 
 as.POSIXct(data$created_utc, origin="1970-01-01")
@@ -174,9 +180,7 @@ reddit_sentiment_counts <- reddit_mentions_sentiment %>%
 
 #plot sentiment over time
 reddit_sentiment_counts %>% 
-  filter(stock_mention %in% top5) %>% 
-  ggplot(aes(x = Date, y = sentiment, color = stock_mention)) +
-  geom_smooth(se = F)
+  filter(stock_mention %in% top5) %>% ggplot(aes(x = Date, y = sentiment, color = stock_mention)) +geom_smooth(se = F)
 
 
 #Getting stock prices based on most mentioned stocks
