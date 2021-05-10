@@ -23,7 +23,7 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 100000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
 #alternative? to check if fread skips rows
 #data = read.csv("wsb_comments_raw.csv",nrows=10000)
 #remove all columns where only NAs
