@@ -23,7 +23,7 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 100000))
 #alternative? to check if fread skips rows
 #data = read.csv("wsb_comments_raw.csv",nrows=10000)
 #remove all columns where only NAs
@@ -152,21 +152,25 @@ reddit_mentions %>%
 reddit_mentions %>% 
   filter(!(stock_mention %in% fp))
 
+#apply vader to get sentiment of comments from stocks
 comments_sentiment = reddit_mentions %>%
   select(body) %>%
   distinct() %>%
   mutate(comment_clean = str_replace_all(body, "\\\\", " ")) %>%
   mutate(sentiment = vader_df(comment_clean)$compound)
 
+#add sentiment to mentions df
 reddit_mentions_sentiment <- reddit_mentions %>% 
   left_join(comments_sentiment %>% select(-comment_clean),
             by = "body")
 
+#sentiment by day and stock
 reddit_sentiment_counts <- reddit_mentions_sentiment %>% 
   group_by(Date, stock_mention) %>% 
   summarise(sentiment = mean(sentiment),
             n = n())
 
+#plot sentiment over time
 reddit_sentiment_counts %>% 
   filter(stock_mention %in% top5) %>% 
   ggplot(aes(x = Date, y = sentiment, color = stock_mention)) +
