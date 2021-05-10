@@ -10,6 +10,7 @@ library(tibble)
 library(tidyverse)
 library(vader)
 library(chron)
+library(quantmod)
 
 #setting working directory
 Paths = c("/Users/jonasschmitten/Downloads/Sentiment_Analysis_WSB", 
@@ -178,5 +179,19 @@ reddit_sentiment_counts %>%
   ggplot(aes(x = Date, y = sentiment, color = stock_mention)) +
   geom_smooth(se = F) +
   theme_classic()
+
+
+
+#Getting stock prices based on most mentioned stocks
+getSymbols(top5, src = "yahoo", from = '2020-02-02', to = '2021-05-10')
+
+stock_prices = map(top5,function(x) Ad(get(x)))
+stock_prices = reduce(stock_prices, merge)
+colnames(stock_prices) = top5
+
+for (i in length(top5)){
+  rm(list = top5[i])
+}
+
 
 
