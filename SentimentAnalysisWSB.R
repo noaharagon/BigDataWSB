@@ -189,9 +189,10 @@ stock_prices = map(top5,function(x) Ad(get(x)))
 stock_prices = reduce(stock_prices, merge)
 colnames(stock_prices) = top5
 
-for (i in length(top5)){
+#Remove unnecessary variables 
+for (i in 1:length(top5)){
   rm(list = top5[i])
-}
+  }
 
 
 
