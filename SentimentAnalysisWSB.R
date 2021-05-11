@@ -155,14 +155,6 @@ top5 <- reddit_mention_counts %>%
 #   filter(stock_mention %in% top5) %>% 
 #   ggplot(aes(x = Date, y = n, color = stock_mention)) + geom_line() #+ theme_classic()
 
-
-reddit_mentions %>% 
-  filter(!(stock_mention %in% fp)) %>% 
-  group_by(stock_mention) %>% 
-  count() %>% 
-  arrange(-n) %>% 
-  print(n = 20)
-
 #apply vader to get sentiment of comments from stocks (but only most mentioned stocks)
 comments_sentiment = reddit_mentions %>%
   filter(stock_mention %in% unique(monthly_top5$stock_mention))%>%
@@ -182,8 +174,17 @@ reddit_mentions_sentiment <- reddit_mentions %>%
 #sentiment by day and stock
 reddit_sentiment_counts <- reddit_mentions_sentiment %>% 
   group_by(Date, stock_mention) %>% 
-  summarise(sentiment = mean(sentiment),
+  summarise(sentiment = mean(sentiment, na.rm = T),
             n = n())
+
+#create portfolio of stocks
+reddit_sentiment_counts$Month = format(as.Date(reddit_sentiment_counts$Date), "%Y-%m")
+sentiment_portfolio <- reddit_sentiment_counts %>%
+  group_by(Month, stock_mention) %>%
+  summarise(n = sum(n), sentiment = mean(sentiment, na.rm = T)) %>%
+  arrange(Month, -n) %>%
+  slice_head(n = 5)
+  
 
 
 #plot sentiment over time
