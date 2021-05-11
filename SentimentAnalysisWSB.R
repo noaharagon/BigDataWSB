@@ -12,6 +12,8 @@ library(vader)
 library(chron)
 library(quantmod)
 
+library(vroom)
+
 #setting working directory
 Paths = c("/Users/jonasschmitten/Downloads/Sentiment_Analysis_WSB", 
           "/Users/noahangara/Downloads")
@@ -24,9 +26,10 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 100000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 1000000))
+
 #alternative? to check if fread skips rows
-#data = read.csv("wsb_comments_raw.csv",nrows=10000)
+#data = read.csv("wsb_comments_raw.csv",nrows=100000)
 #remove all columns where only NAs
 data = data[,colSums(is.na(data))<nrow(data)]
 
@@ -67,6 +70,9 @@ data = data[order(data$Date, data$Time),]
 
 #reset index after ordering 
 row.names(data) <- NULL
+
+#nrow(data[data$Date == "2020-02-22",])
+
 # Adding Words to Vader Dictionary ----------------------------------------
 
 # let's add some words to the dictionary that are specific to WSB
@@ -137,7 +143,7 @@ test = reddit_mention_counts %>%
   group_by(Month, stock_mention) %>%
   summarise(n = sum(n)) %>%
   filter(!(stock_mention %in% fp)) %>% 
-  top_n(5)
+  top_n(15)
 
 #get top 5 stocks mentioned in the data
 top5 <- reddit_mention_counts %>% 
