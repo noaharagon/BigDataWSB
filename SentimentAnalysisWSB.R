@@ -24,7 +24,7 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 100000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
 #alternative? to check if fread skips rows
 #data = read.csv("wsb_comments_raw.csv",nrows=10000)
 #remove all columns where only NAs
@@ -70,16 +70,16 @@ row.names(data) <- NULL
 # Adding Words to Vader Dictionary ----------------------------------------
 
 # let's add some words to the dictionary that are specific to WSB
-wsbLexicon <- bind_rows(tibble(V1 = c("retard", "retarded", "fuck", "fucking", "autist", "fag", "gay", "stonk", "porn", 
-                                      "degenerate", "boomer", "ape", "gorilla"), V2 = 0, V3 = 0.5), # neutral 
+wsbLexicon <- bind_rows(tibble(V1 = c("retard", "retarded", "fuck", "fucking", "autist", "fag", "faggot", "gay", "stonk", "porn", 
+                                      "degenerate", "boomer", "ape", "gorilla", "shit"), V2 = 0, V3 = 0.5), # neutral 
                         tibble(V1 = c("bull", "bullish", "tendie", "tendies", "call", "long", "buy", "moon", "hold",# positive
                                       "diamond", "hands", "yolo", "yoloed", "free", "btfd", "rocket", "elon", "gain",
                                       "420", "calls", "longs", "sky", "space", "roof", "squeeze", "balls", "JPOW", "printer",
                                       "brrr", "HODL", "daddy", "BTFD", "squoze", "full moon", "full moon face", "ox", "astronaut",
-                                      "man astronaut", "gem stone", "money bag"), V2 = 1.5, V3 = 0.5),                     
+                                      "man astronaut", "gem stone", "money bag", "green", "profit"), V2 = 3, V3 = 0.5),                     
                         tibble(V1 = c("bear", "sell", "put", "short", "shorts", "puts", "bagholder", "wife", "boyfriend",# negative
                                       "shorting", "citron", "hedge", "fake", "virgin", "cuck", "guh", "paper", "SEC", "drilling",
-                                      "bear face", "briefcase", "roll of paper"), V2 = -1.5, V3 = 0.5))
+                                      "bear face", "briefcase", "roll of paper", "red"), V2 = -1.5, V3 = 0.5))
 
 # add back to lexicon
 vaderLexiconWSB <- vaderLexicon %>% 
@@ -124,7 +124,7 @@ reddit_mention_counts <- reddit_mentions %>%
 reddit_mention_counts$Month = format(as.Date(reddit_mention_counts$Date), "%Y-%m")
 
 
-# false positives (non-stock related):
+# false positive acronyms which could be mistaken as tickers (non-stock related):
 for (i in LETTERS){
   print(stock_tickers%>%filter(stock_tickers$Symbol == i))
   }
@@ -133,11 +133,12 @@ fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "
         "IQ", LETTERS)
 
 #return the 5 most mentioned stocks by month
-test = reddit_mention_counts %>%
+monthly_top5 = reddit_mention_counts %>%
   group_by(Month, stock_mention) %>%
   summarise(n = sum(n)) %>%
   filter(!(stock_mention %in% fp)) %>% 
   top_n(5)
+
 
 #get top 5 stocks mentioned in the data
 top5 <- reddit_mention_counts %>% 
@@ -150,9 +151,9 @@ top5 <- reddit_mention_counts %>%
   pull(stock_mention)
 
 #plot mentions of top5 stocks 
-reddit_mention_counts %>% 
-  filter(stock_mention %in% top5) %>% 
-  ggplot(aes(x = Date, y = n, color = stock_mention)) + geom_line() #+ theme_classic()
+# reddit_mention_counts %>% 
+#   filter(stock_mention %in% top5) %>% 
+#   ggplot(aes(x = Date, y = n, color = stock_mention)) + geom_line() #+ theme_classic()
 
 
 reddit_mentions %>% 
@@ -162,17 +163,18 @@ reddit_mentions %>%
   arrange(-n) %>% 
   print(n = 20)
 
-reddit_mentions %>% 
-  filter(!(stock_mention %in% fp))
-
-#apply vader to get sentiment of comments from stocks
+#apply vader to get sentiment of comments from stocks (but only most mentioned stocks)
 comments_sentiment = reddit_mentions %>%
+  filter(stock_mention %in% unique(monthly_top5$stock_mention))%>%
   select(body) %>%
   distinct() %>%
   mutate(comment_clean = str_replace_all(body, "\\\\", " ")) %>%
   mutate(sentiment = vader_df(comment_clean)$compound)
 
-#add sentiment to mentions df
+#add sentiment to mentions df but only for top 5 monthly stocks
+reddit_mentions = reddit_mentions %>%
+  filter(stock_mention %in% unique(monthly_top5$stock_mention))
+
 reddit_mentions_sentiment <- reddit_mentions %>% 
   left_join(comments_sentiment %>% select(-comment_clean),
             by = "body")
