@@ -11,6 +11,7 @@ library(tidyverse)
 library(vader)
 library(chron)
 library(quantmod)
+library(tidyquant)
 
 #setting working directory
 Paths = c("/Users/jonasschmitten/Downloads/Sentiment_Analysis_WSB", 
@@ -183,9 +184,23 @@ sentiment_portfolio <- reddit_sentiment_counts %>%
   group_by(Month, stock_mention) %>%
   summarise(n = sum(n), sentiment = mean(sentiment, na.rm = T)) %>%
   arrange(Month, -n) %>%
-  slice_head(n = 5)
-  
+  slice_head(n = 5) %>%
+  mutate(id = row_number())
 
+#arrange df by stocks
+sentiment_portfolio = sentiment_portfolio %>%
+  group_by(Month, stock_mention) %>%
+  pivot_wider(id_cols = Month, names_from = id, values_from = stock_mention, names_sep = "")
+sentiment_portfolio$Month = as.Date(paste(sentiment_portfolio$Month,"-01",sep=""))
+sentiment_portfolio = as.data.frame(sentiment_portfolio)
+
+#attempt to get value of portfolio by month i.e. 
+test = apply(sentiment_portfolio[,c(2:6)], 1, function(x) tq_get(paste(x), from = "2020-02-02", to = "2020-02-03", get = "stock.prices"))
+
+
+stock_month = tq_get(paste(sentiment_portfolio[1, c(2:6)]), from = "2021-02-02", to = "2021-02-03", get = "stock.prices") %>%
+  group_by(date)%>%
+  summarise(PortfolioValue = sum(close))
 
 #plot sentiment over time
 reddit_sentiment_counts %>% 
@@ -193,7 +208,7 @@ reddit_sentiment_counts %>%
 
 
 #Getting stock prices based on most mentioned stocks
-getSymbols(top5, src = "yahoo", from = '2020-02-02', to = '2021-05-10')
+getSymbols(sentiment_portfolio, src = "yahoo", from = '2020-02-02', to = '2021-05-10')
 
 stock_prices = map(top5,function(x) Ad(get(x)))
 stock_prices = reduce(stock_prices, merge)
