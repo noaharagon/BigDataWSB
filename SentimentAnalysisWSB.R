@@ -194,13 +194,23 @@ sentiment_portfolio = sentiment_portfolio %>%
 sentiment_portfolio$Month = as.Date(paste(sentiment_portfolio$Month,"-01",sep=""))
 sentiment_portfolio = as.data.frame(sentiment_portfolio)
 
-#attempt to get value of portfolio by month i.e. 
-test = apply(sentiment_portfolio[,c(2:6)], 1, function(x) tq_get(paste(x), from = "2020-02-02", to = "2020-02-03", get = "stock.prices"))
 
+#get value of five stocks each month (i.e. row) 
+portfolio_value = vector("list", nrow(sentiment_portfolio))
+for (row in 1:nrow(sentiment_portfolio)) {
+  stuff = tq_get(paste(sentiment_portfolio[row, c(2:6)]),get = "stock.prices", from = sentiment_portfolio[row, 1], to = sentiment_portfolio[row, 1]+30) %>%
+    group_by(date)%>%
+    summarise(PortfolioValue = sum(close))%>%
+    filter(row_number() %in% c(1, n()))
+  portfolio_value[[row]] = stuff
+}
 
-stock_month = tq_get(paste(sentiment_portfolio[1, c(2:6)]), from = "2021-02-02", to = "2021-02-03", get = "stock.prices") %>%
-  group_by(date)%>%
-  summarise(PortfolioValue = sum(close))
+#value of stocks as DataFrame
+value_of_stocks <- data.frame(matrix(unlist(portfolio_value), nrow=length(portfolio_value), byrow=TRUE))
+value_of_stocks$X1 = as.Date(value_of_stocks$X1)
+value_of_stocks$X2 = as.Date(value_of_stocks$X2)
+colnames(value_of_stocks) = c("Hold Begin", "Hold End", "Begin Price", "End Price")
+
 
 #plot sentiment over time
 reddit_sentiment_counts %>% 
