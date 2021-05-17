@@ -128,6 +128,9 @@ reddit_mentions <- data %>%
 rm(data)
 gc()
 
+#read stopwords text
+stop_words = read_tsv("stop_words_english.txt")
+
 #Create Word Cloud of Comments
 word_cloud <- Corpus(VectorSource(reddit_mentions$body))
 # Convert the text to lower case
@@ -136,7 +139,8 @@ word_cloud <- tm_map(word_cloud, content_transformer(tolower))
 word_cloud <- tm_map(word_cloud, removeNumbers)
 # Remove english common stopwords
 word_cloud <- tm_map(word_cloud, removeWords, stopwords("english"))
-word_cloud <- tm_map(word_cloud, removeWords, c("will", "get", "got", "can", "also"))
+word_cloud <- tm_map(word_cloud, removeWords, t(stop_words))
+word_cloud <- tm_map(word_cloud, removeWords, c("’", "finally", "making", "couple", "people", "feel", "time"))
 # Remove punctuations
 word_cloud <- tm_map(word_cloud, removePunctuation)
 # Eliminate extra white spaces
@@ -151,7 +155,7 @@ d <- data.frame(word = names(v),freq=v)
 set.seed(1234)
 wordcloud(words = d$word, freq = d$freq, min.freq = 1,
           max.words=200, random.order=FALSE, rot.per=0.35, 
-          colors=brewer.pal(8, "Dark2"))
+          colors=brewer.pal(8, "Dark2"), scale = c(2,0.4))
 
 
 reddit_mention_counts <- reddit_mentions %>% 
