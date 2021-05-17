@@ -236,9 +236,9 @@ portfolio_stocks = as.data.frame(portfolio_stocks)
 
 
 #get value of five stocks each month (i.e. row) 
-portfolio_value = vector("list", nrow(sentiment_portfolio)) #pre-allocate memory
-for (row in 1:nrow(sentiment_portfolio)) {
-  stuff = tq_get(paste(sentiment_portfolio[row, c(2:6)]),get = "stock.prices", from = sentiment_portfolio[row, 1], to = sentiment_portfolio[row, 1]+30) %>%
+portfolio_value = vector("list", nrow(portfolio_stocks)) #pre-allocate memory
+for (row in 1:nrow(portfolio_stocks)) {
+  stuff = tq_get(paste(portfolio_stocks[row, c(2:6)]),get = "stock.prices", from = portfolio_stocks[row, 1], to = portfolio_stocks[row, 1]+31) %>%
     group_by(date)%>%
     summarise(PortfolioValue = sum(close))%>%
     filter(row_number() %in% c(1, n()))
