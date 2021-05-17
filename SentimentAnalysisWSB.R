@@ -231,7 +231,7 @@ sentiment_portfolio <- reddit_sentiment_counts %>%
 portfolio_stocks = sentiment_portfolio %>%
   group_by(Month, stock_mention) %>%
   pivot_wider(id_cols = Month, names_from = id, values_from = stock_mention, names_sep = "")
-portfolio_stocks$Month = as.Date(paste(portfolio_stocks$Month,"-01",sep=""))+31
+portfolio_stocks$Month = ceiling_date(as.Date(paste(portfolio_stocks$Month,"-01",sep="")), "months")
 portfolio_stocks = as.data.frame(portfolio_stocks)
 
 
@@ -252,7 +252,7 @@ for (row in 1:nrow(portfolio_stocks)) {
   # if there are stocks in previous top 5 get closing price of prev. month
   else{
     duplicates = data.frame(tq_get(paste(portfolio_stocks[row, which(portfolio_stocks[row,] %in% portfolio_stocks[row-1,])]),
-                        get = "stock.prices", from = floor_date(portfolio_stocks[row, 1], "month")-days(1), to = ceiling_date(portfolio_stocks[row, 1], "month")-days(1))) %>%
+                        get = "stock.prices", from = (floor_date(portfolio_stocks[row, 1], "month")-days(1)), to = ceiling_date(portfolio_stocks[row, 1], "month")-days(1))) %>%
       # get opening and closing prices with
       group_by(symbol)%>%
       # get beginning and end of month
@@ -275,27 +275,29 @@ test = test %>%
 test2 = bind_rows(non_duplicate_list)
 test2 = test2 %>%
   select(symbol, date, open, close)
+
 #opening prices (beginning of month)
-# opening_unique = test2[seq(1, nrow(test2), 2), c("symbol", "date", "open")]
-# opening_unique$date = format(as.Date(opening_unique$date), "%Y-%m")
-# closing_unique = test2[seq(2, nrow(test2), 2), c("symbol", "date", "close")]
-# closing_unique$date =format(as.Date(closing_unique$date), "%Y-%m")
+opening_unique = test2[seq(1, nrow(test2), 2), c("symbol", "date", "open")]
+opening_unique$date = format(as.Date(opening_unique$date), "%Y-%m")
+closing_unique = test2[seq(2, nrow(test2), 2), c("symbol", "date", "close")]
+closing_unique$date =format(as.Date(closing_unique$date), "%Y-%m")
 # 
-# #opening prices duplicates
-# opening_dup = test[seq(1, nrow(test), 2), c("symbol", "date", "open")]
-# opening_dup$date = format(as.Date(opening_dup$date+31), "%Y-%m")
-# closing_dup = test[seq(2, nrow(test), 2), c("symbol", "date", "close")]
-# closing_dup$date = format(as.Date(closing_dup$date), "%Y-%m")
+#opening prices duplicates
+opening_dup = test[seq(1, nrow(test), 2), c("symbol", "date", "open")]
+opening_dup$date = ceiling_date(as.Date(opening_dup$date), "month")
+opening_dup$date = format(as.Date(opening_dup$date), "%Y-%m")
+closing_dup = test[seq(2, nrow(test), 2), c("symbol", "date", "close")]
+closing_dup$date = format(as.Date(closing_dup$date), "%Y-%m")
 # 
-# #put all opening prices into nice dataframe
-# portfolio_open = rbind(opening_dup, opening_unique)
-# portfolio_open$date = as.Date(paste(portfolio_open$date,"-01",sep=""))
-# portfolio_open = portfolio_open %>%
-#   arrange(date) %>%
-#   group_by(date) %>%
-#   mutate(id = row_number()) %>%
-#   pivot_wider(id_cols = date, names_from = id, values_from = open, names_sep = "")
-# 
+#put all opening prices into nice dataframe
+portfolio_open = rbind(opening_dup, opening_unique)
+portfolio_open$date = as.Date(paste(portfolio_open$date,"-01",sep=""))
+portfolio_open = portfolio_open %>%
+  arrange(date) %>%
+  group_by(date) %>%
+  mutate(id = row_number()) %>%
+  pivot_wider(id_cols = date, names_from = id, values_from = open, names_sep = "")
+#
 # rm(test, test2, duplicate, non_duplicates, opening_dup, opening_unique, closing_unique, closing_dup)
 
 #plot sentiment of portfolio with value
