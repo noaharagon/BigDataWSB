@@ -236,33 +236,36 @@ portfolio_stocks = as.data.frame(portfolio_stocks)
 
 
 #get value of five stocks each month (i.e. row) 
-portfolio_value = vector("list", nrow(portfolio_stocks)) #pre-allocate memory
+duplicate_list = vector("list", nrow(portfolio_stocks)) #pre-allocate memory
+non_duplicate_list = vector("list", nrow(portfolio_stocks)) ##pre-allocate memory
 for (row in 1:nrow(portfolio_stocks)) {
-  stuff = tq_get(paste(portfolio_stocks[row, c(2:6)]),get = "stock.prices", from = portfolio_stocks[row, 1], to = portfolio_stocks[row, 1]+31) %>%
-    group_by(date)%>%
-    summarise(PortfolioValue = sum(close))%>%
+  #if length == 0 we have no stocks in previous months top 5
+  if (length(which(portfolio_stocks[row,] %in% portfolio_stocks[row-1,])) == 0){
+  non_duplicates = data.frame(tq_get(paste(portfolio_stocks[row, c(2:6)]), get = "stock.prices", from = portfolio_stocks[row, 1], to = portfolio_stocks[row, 1]+31)) %>%
+    # get opening and closing prices with 
+    group_by(symbol)%>%
+    # get beginning and end of month
     filter(row_number() %in% c(1, n()))
-  portfolio_value[[row]] = stuff
+  non_duplicate_list[[row]] = non_duplicates
+  }
+  # if there are stocks in previous top 5 get closing price of prev. month
+  else{
+    duplicates = data.frame(tq_get(paste(portfolio_stocks[row, which(portfolio_stocks[row,] %in% portfolio_stocks[row-1,])]),
+                        get = "stock.prices", from = portfolio_stocks[row, 1]-31, to = portfolio_stocks[row, 1]+31)) %>%
+      # get opening and closing prices with
+      group_by(symbol)%>%
+      # get beginning and end of month
+      filter(row_number() %in% c(1, n()))
+      duplicate_list[[row]] = duplicates
+      non_duplicates = data.frame(tq_get(paste(portfolio_stocks[row, which(!(portfolio_stocks[row,] %in% portfolio_stocks[row-1,]))]),
+                            get = "stock.prices", from = portfolio_stocks[row, 1], to = portfolio_stocks[row, 1]+31)) %>%
+      # get opening and closing prices with 
+      group_by(symbol)%>%
+      # get beginning and end of month
+      filter(row_number() %in% c(1, n()))
+      non_duplicate_list[[row]] = non_duplicates
+  }
 }
-
-#which stocks enter portfolio new, which ones do we hold
-stocks_held_list = vector("list", length = nrow(portfolio_stocks))
-stocks_added_list = vector("list", length = nrow(portfolio_stocks))
-for (row in 1:nrow(portfolio_stocks)){
-  stocks_held = as.data.frame(portfolio_stocks[row, which(portfolio_stocks[row,] %in% portfolio_stocks[row-1,])])
-  stocks_added = as.data.frame(portfolio_stocks[row, which(!(portfolio_stocks[row,] %in% portfolio_stocks[row-1,]))])
-  stocks_held_list[[row]] = stocks_held
-  stocks_added_list[[row]] = stocks_added
-}
-
-stocks_held_df = bind_rows(stocks_held_list)
-stocks_added_df = bind_rows(stocks_added_list)
-
-#value of stocks as DataFrame
-value_of_stocks <- data.frame(matrix(unlist(portfolio_value), nrow=length(portfolio_value), byrow=TRUE))
-value_of_stocks$X1 = as.Date(value_of_stocks$X1)
-value_of_stocks$X2 = as.Date(value_of_stocks$X2)
-colnames(value_of_stocks) = c("Hold Begin", "Hold End", "Begin Price", "End Price")
 
 #calculate performance
 
