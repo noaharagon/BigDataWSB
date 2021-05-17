@@ -236,69 +236,22 @@ portfolio_stocks = as.data.frame(portfolio_stocks)
 
 
 #get value of five stocks each month (i.e. row) 
-duplicate_list = vector("list", nrow(portfolio_stocks)) #pre-allocate memory
-non_duplicate_list = vector("list", nrow(portfolio_stocks)) ##pre-allocate memory
+stock_price_list = vector("list", length = nrow(portfolio_stocks))
 for (row in 1:nrow(portfolio_stocks)) {
   #if length == 0 we have no stocks in previous months top 5
-  if (length(which(portfolio_stocks[row,] %in% portfolio_stocks[row-1,])) == 0){
-  non_duplicates = data.frame(tq_get(paste(portfolio_stocks[row, c(2:6)]), get = "stock.prices", 
+  stock_prices = data.frame(tq_get(paste(portfolio_stocks[row, c(2:6)]), get = "stock.prices", 
                                      from = portfolio_stocks[row, 1], to = ceiling_date(portfolio_stocks[row, 1], "month")-days(1))) %>%
-    # get opening and closing prices with 
+    # get opening and closing prices
     group_by(symbol)%>%
     # get beginning and end of month
     filter(row_number() %in% c(1, n()))
-  non_duplicate_list[[row]] = non_duplicates
-  }
-  # if there are stocks in previous top 5 get closing price of prev. month
-  else{
-    duplicates = data.frame(tq_get(paste(portfolio_stocks[row, which(portfolio_stocks[row,] %in% portfolio_stocks[row-1,])]),
-                        get = "stock.prices", from = (floor_date(portfolio_stocks[row, 1], "month")-days(1)), to = ceiling_date(portfolio_stocks[row, 1], "month")-days(1))) %>%
-      # get opening and closing prices with
-      group_by(symbol)%>%
-      # get beginning and end of month
-      filter(row_number() %in% c(1, n()))
-      duplicate_list[[row]] = duplicates
-      non_duplicates = data.frame(tq_get(paste(portfolio_stocks[row, which(!(portfolio_stocks[row,] %in% portfolio_stocks[row-1,]))]),
-                            get = "stock.prices", from = portfolio_stocks[row, 1], to = ceiling_date(portfolio_stocks[row, 1], "month")-days(1))) %>%
-      # get opening and closing prices with 
-      group_by(symbol)%>%
-      # get beginning and end of month
-      filter(row_number() %in% c(1, n()))
-      non_duplicate_list[[row]] = non_duplicates
-  }
+  stock_price_list[[row]] = stock_prices
 }
-#duplicates (stocks we hold)
-test = bind_rows(duplicate_list)
-test = test %>%
-  select(symbol, date, open, close)
-#non-duplicate stocks (stock we add)
-test2 = bind_rows(non_duplicate_list)
-test2 = test2 %>%
-  select(symbol, date, open, close)
+#df with opening and closing prices
+stock_df = bind_rows(stock_price_list)
 
-#opening prices (beginning of month)
-opening_unique = test2[seq(1, nrow(test2), 2), c("symbol", "date", "open")]
-opening_unique$date = format(as.Date(opening_unique$date), "%Y-%m")
-closing_unique = test2[seq(2, nrow(test2), 2), c("symbol", "date", "close")]
-closing_unique$date =format(as.Date(closing_unique$date), "%Y-%m")
-# 
-#opening prices duplicates
-opening_dup = test[seq(1, nrow(test), 2), c("symbol", "date", "open")]
-opening_dup$date = ceiling_date(as.Date(opening_dup$date), "month")
-opening_dup$date = format(as.Date(opening_dup$date), "%Y-%m")
-closing_dup = test[seq(2, nrow(test), 2), c("symbol", "date", "close")]
-closing_dup$date = format(as.Date(closing_dup$date), "%Y-%m")
-# 
-#put all opening prices into nice dataframe
-portfolio_open = rbind(opening_dup, opening_unique)
-portfolio_open$date = as.Date(paste(portfolio_open$date,"-01",sep=""))
-portfolio_open = portfolio_open %>%
-  arrange(date) %>%
-  group_by(date) %>%
-  mutate(id = row_number()) %>%
-  pivot_wider(id_cols = date, names_from = id, values_from = open, names_sep = "")
-#
-# rm(test, test2, duplicate, non_duplicates, opening_dup, opening_unique, closing_unique, closing_dup)
+
+
 
 #plot sentiment of portfolio with value
 sentiment_portfolio %>%
