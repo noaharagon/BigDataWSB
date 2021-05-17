@@ -246,11 +246,11 @@ for (row in 1:nrow(portfolio_stocks)) {
 }
 
 #which stocks enter portfolio new, which ones do we hold
-stocks_held_list = vector("list", length = nrow(sentiment_portfolio))
-stocks_added_list = vector("list", length = nrow(sentiment_portfolio))
-for (row in 1:nrow(sentiment_portfolio)){
-  stocks_held = as.data.frame(sentiment_portfolio[row, which(sentiment_portfolio[row,] %in% sentiment_portfolio[row-1,])])
-  stocks_added = as.data.frame(sentiment_portfolio[row, which(!(sentiment_portfolio[row,] %in% sentiment_portfolio[row-1,]))])
+stocks_held_list = vector("list", length = nrow(portfolio_stocks))
+stocks_added_list = vector("list", length = nrow(portfolio_stocks))
+for (row in 1:nrow(portfolio_stocks)){
+  stocks_held = as.data.frame(portfolio_stocks[row, which(portfolio_stocks[row,] %in% portfolio_stocks[row-1,])])
+  stocks_added = as.data.frame(portfolio_stocks[row, which(!(portfolio_stocks[row,] %in% portfolio_stocks[row-1,]))])
   stocks_held_list[[row]] = stocks_held
   stocks_added_list[[row]] = stocks_added
 }
