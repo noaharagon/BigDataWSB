@@ -14,6 +14,10 @@ library(quantmod)
 library(tidyquant)
 library(pryr)
 library(compare)
+library(tm)
+library(SnowballC)
+library(wordcloud)
+library(RColorBrewer)
 
 #setting working directory
 Paths = c("/Users/jonasschmitten/Downloads/Sentiment_Analysis_WSB", 
@@ -124,6 +128,32 @@ reddit_mentions <- data %>%
 rm(data)
 gc()
 
+#Create Word Cloud of Comments
+word_cloud <- Corpus(VectorSource(reddit_mentions$body))
+# Convert the text to lower case
+word_cloud <- tm_map(word_cloud, content_transformer(tolower))
+# Remove numbers
+word_cloud <- tm_map(word_cloud, removeNumbers)
+# Remove english common stopwords
+word_cloud <- tm_map(word_cloud, removeWords, stopwords("english"))
+word_cloud <- tm_map(word_cloud, removeWords, c("will", "get", "got", "can", "also"))
+# Remove punctuations
+word_cloud <- tm_map(word_cloud, removePunctuation)
+# Eliminate extra white spaces
+word_cloud <- tm_map(word_cloud, stripWhitespace)
+
+#Add Elements to matrix and count number of words
+dtm <- TermDocumentMatrix(word_cloud)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+
+set.seed(1234)
+wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+
+
 reddit_mention_counts <- reddit_mentions %>% 
   group_by(Date, stock_mention) %>% 
   count()
@@ -193,11 +223,11 @@ sentiment_portfolio <- reddit_sentiment_counts %>%
   mutate(id = row_number())
 
 #arrange df by stocks
-sentiment_portfolio = sentiment_portfolio %>%
+portfolio_stocks = sentiment_portfolio %>%
   group_by(Month, stock_mention) %>%
   pivot_wider(id_cols = Month, names_from = id, values_from = stock_mention, names_sep = "")
-sentiment_portfolio$Month = as.Date(paste(sentiment_portfolio$Month,"-01",sep=""))
-sentiment_portfolio = as.data.frame(sentiment_portfolio)
+portfolio_stocks$Month = as.Date(paste(portfolio_stocks$Month,"-01",sep=""))
+portfolio_stocks = as.data.frame(portfolio_stocks)
 
 
 
@@ -233,6 +263,12 @@ colnames(value_of_stocks) = c("Hold Begin", "Hold End", "Begin Price", "End Pric
 
 #calculate performance
 
+
+#plot sentiment of portfolio with value
+sentiment_portfolio %>%
+  group_by(Month) %>%
+  summarise(mean_sentiment = mean(sentiment, na.rm = T)) %>%
+  ggplot() + geom_line(aes(x = Month, y = mean_sentiment, group = 1))
 
 
 #get value of S&P500 as benchmark
