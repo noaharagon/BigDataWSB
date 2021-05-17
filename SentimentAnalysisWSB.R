@@ -241,7 +241,8 @@ non_duplicate_list = vector("list", nrow(portfolio_stocks)) ##pre-allocate memor
 for (row in 1:nrow(portfolio_stocks)) {
   #if length == 0 we have no stocks in previous months top 5
   if (length(which(portfolio_stocks[row,] %in% portfolio_stocks[row-1,])) == 0){
-  non_duplicates = data.frame(tq_get(paste(portfolio_stocks[row, c(2:6)]), get = "stock.prices", from = portfolio_stocks[row, 1], to = portfolio_stocks[row, 1]+31)) %>%
+  non_duplicates = data.frame(tq_get(paste(portfolio_stocks[row, c(2:6)]), get = "stock.prices", 
+                                     from = portfolio_stocks[row, 1], to = portfolio_stocks[row, 1]+30)) %>%
     # get opening and closing prices with 
     group_by(symbol)%>%
     # get beginning and end of month
@@ -266,9 +267,36 @@ for (row in 1:nrow(portfolio_stocks)) {
       non_duplicate_list[[row]] = non_duplicates
   }
 }
+#duplicates
+test = bind_rows(duplicate_list)
+test = test %>%
+  select(symbol, date, open, close)
+#non-duplicates
+test2 = bind_rows(non_duplicate_list)
+test2 = test2 %>%
+  select(symbol, date, open, close)
+#opening prices (beginning of month)
+opening_unique = test2[seq(1, nrow(test2), 2), c("symbol", "date", "open")]
+opening_unique$date = format(as.Date(opening_unique$date), "%Y-%m")
+closing_unique = test2[seq(2, nrow(test2), 2), c("symbol", "date", "close")]
+closing_unique$date =format(as.Date(closing_unique$date), "%Y-%m")
 
-#calculate performance
+#opening prices duplicates
+opening_dup = test[seq(1, nrow(test), 2), c("symbol", "date", "open")]
+opening_dup$date = format(as.Date(opening_dup$date+31), "%Y-%m")
+closing_dup = test[seq(2, nrow(test), 2), c("symbol", "date", "close")]
+closing_dup$date = format(as.Date(closing_dup$date), "%Y-%m")
 
+#put all opening prices into nice dataframe
+portfolio_open = rbind(opening_dup, opening_unique)
+portfolio_open$date = as.Date(paste(portfolio_open$date,"-01",sep=""))
+portfolio_open = portfolio_open %>%
+  arrange(date) %>%
+  group_by(date) %>%
+  mutate(id = row_number()) %>%
+  pivot_wider(id_cols = date, names_from = id, values_from = open, names_sep = "")
+
+rm(test, test2, duplicate, non_duplicates, opening_dup, opening_unique, closing_unique, closing_dup)
 
 #plot sentiment of portfolio with value
 sentiment_portfolio %>%
