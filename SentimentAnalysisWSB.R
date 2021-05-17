@@ -12,6 +12,7 @@ library(vader)
 library(chron)
 library(quantmod)
 library(tidyquant)
+library(pryr)
 
 #setting working directory
 Paths = c("/Users/jonasschmitten/Downloads/Sentiment_Analysis_WSB", 
@@ -25,7 +26,7 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 1000000))
 #alternative? to check if fread skips rows
 #data = read.csv("wsb_comments_raw.csv",nrows=10000)
 #remove all columns where only NAs
@@ -119,6 +120,9 @@ reddit_mentions <- data %>%
   mutate(stock_mention = str_extract_all(body, reg_expression)) %>%
   unnest(cols = stock_mention)
 
+rm(data)
+gc()
+
 reddit_mention_counts <- reddit_mentions %>% 
   group_by(Date, stock_mention) %>% 
   count()
@@ -196,7 +200,7 @@ sentiment_portfolio = as.data.frame(sentiment_portfolio)
 
 
 #get value of five stocks each month (i.e. row) 
-portfolio_value = vector("list", nrow(sentiment_portfolio))
+portfolio_value = vector("list", nrow(sentiment_portfolio)) #pre-allocate memory
 for (row in 1:nrow(sentiment_portfolio)) {
   stuff = tq_get(paste(sentiment_portfolio[row, c(2:6)]),get = "stock.prices", from = sentiment_portfolio[row, 1], to = sentiment_portfolio[row, 1]+30) %>%
     group_by(date)%>%
@@ -217,17 +221,17 @@ reddit_sentiment_counts %>%
   filter(stock_mention %in% top5) %>% ggplot(aes(x = Date, y = sentiment, color = stock_mention)) +geom_smooth(se = F)
 
 
-#Getting stock prices based on most mentioned stocks
-getSymbols(sentiment_portfolio, src = "yahoo", from = '2020-02-02', to = '2021-05-10')
-
-stock_prices = map(top5,function(x) Ad(get(x)))
-stock_prices = reduce(stock_prices, merge)
-colnames(stock_prices) = top5
-
-#Remove unnecessary variables 
-for (i in 1:length(top5)){
-  rm(list = top5[i])
-}
+# #Getting stock prices based on most mentioned stocks
+# getSymbols(sentiment_portfolio, src = "yahoo", from = '2020-02-02', to = '2021-05-10')
+# 
+# stock_prices = map(top5,function(x) Ad(get(x)))
+# stock_prices = reduce(stock_prices, merge)
+# colnames(stock_prices) = top5
+# 
+# #Remove unnecessary variables 
+# for (i in 1:length(top5)){
+#   rm(list = top5[i])
+# }
 
 
 
