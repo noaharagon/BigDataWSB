@@ -170,7 +170,7 @@ for (i in LETTERS){
   }
 
 fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "ATH",
-        "IQ", "TDA", "IDE", "BE", "AM", "DSP", "FREE", "CC", "AMP", "VTIQ", LETTERS)
+        "IQ", "TDA", "IDE", "BE", "AM", "DSP", "FREE", "CC", "AMP", "VTIQ", "NOM", LETTERS)
 
 #return the 5 most mentioned stocks by month
 monthly_top5 = reddit_mention_counts %>%
@@ -258,7 +258,7 @@ pf_value <- 100000
 diff_pf <- 0
 
 k = 0
-for (i in 1:120){
+for (i in 1:nrow(stock_df)){
   k = k + 1 
   stock_df$value[i] <- floor((1/(ncol(portfolio_stocks)-1) * pf_value)/stock_df$open[i]) * stock_df$open[i]
   if (k == 5) {
@@ -272,6 +272,16 @@ for (i in 1:120){
     }
   }
 }
+
+#calculate returns on a monthly returns
+monthly_sum = stock_df %>%
+  group_by(date) %>%
+  summarise(sum_value = sum(value))
+
+#returns
+monthly_return = data.frame((monthly_sum$sum_value - lag(monthly_sum$sum_value))/lag(monthly_sum$sum_value))
+monthly_return$Date = monthly_sum$date
+
 
 #plot sentiment of portfolio with value
 sentiment_portfolio %>%
