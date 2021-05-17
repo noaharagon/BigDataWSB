@@ -330,3 +330,20 @@ reddit_sentiment_counts %>%
 
 
 
+stocksss = tq_get(c('AAPL', "MSFT"),get = "stock.prices", from ='2019-01-01', to = '2020-12-31')
+
+beginning_value = 0
+end_value = 0
+
+for (i in unique(stocksss$symbol)){
+  beginning_value = beginning_value + floor((1/(ncol(portfolio_stocks)-1)*10000)/stocksss[which(grepl(i, stocksss$symbol))[1],3])*stocksss[which(grepl(i, stocksss$symbol))[1],3]
+  
+  end_value = end_value + floor((1/(ncol(portfolio_stocks)-1)*10000)/stocksss[which(grepl(i, stocksss$symbol))[1],3])*
+    stocksss[which(grepl(i, stocksss$symbol))[length(which(grepl(i, stocksss$symbol)))],6]
+  }
+
+(end_value - beginning_value)/beginning_value
+
+
+
+
