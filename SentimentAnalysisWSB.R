@@ -31,7 +31,7 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 100000))
 #alternative? to check if fread skips rows
 #data = read.csv("wsb_comments_raw.csv",nrows=10000)
 #remove all columns where only NAs
@@ -249,16 +249,46 @@ for (row in 1:nrow(portfolio_stocks)) {
 }
 #df with opening and closing prices
 stock_df = bind_rows(stock_price_list)
+stock_df$value = NA
 
-stock_open = stock_df[seq(1, nrow(stock_df),2), c("symbol", "date", "open")]
-colnames(stock_open)[3] = "price"
-stock_close = stock_df[seq(2, nrow(stock_df),2), c("symbol", "date", "close")]
-colnames(stock_close)[3] = "price"
+# stock_open = stock_df[seq(1, nrow(stock_df),2), c("symbol", "date", "open")]
+# colnames(stock_open)[3] = "price"
+# stock_close = stock_df[seq(2, nrow(stock_df),2), c("symbol", "date", "close")]
+# colnames(stock_close)[3] = "price"
 
-cleand_df = rbind(stock_open, stock_close)
-cleand_df = cleand_df %>%
-  group_by(date, symbol) %>%
-  summarise(value = floor((1/(ncol(portfolio_stocks)-1)*10000)/price)*price)
+# cleand_df = rbind(stock_open, stock_close)
+# cleand_df = cleand_df %>%
+#   group_by(date, symbol) %>%
+#   arrange(symbol)
+#
+# (cleand_df$price - lag(cleand_df$price))/lag(cleand_df$price)
+
+
+
+stock_df = arrange(stock_df, by = date)
+
+heese = stock_df %>%
+  group_by(date)%>%
+  count()
+
+pf_value <- 100000
+diff_pf <- 0
+
+k = 0
+for (i in 1:118){
+  k = k + 1 
+  stock_df$value[i] <- floor((1/(ncol(portfolio_stocks)-1) * pf_value)/stock_df$open[i]) * stock_df$open[i]
+  if (k == 5) {
+    diff_pf <- pf_value - sum(stock_df$value[(i-4):i])
+  }
+  if (k > 5 ) {
+    stock_df$value[i] <- floor((1/(ncol(portfolio_stocks)-1) * pf_value)/stock_df$open[i-5]) * stock_df$close[i]
+    if (k == 10) {
+      pf_value <- sum(stock_df$value[(i-4):i]) + diff_pf
+      k = 0 
+    }
+  }
+}
 
 
 
