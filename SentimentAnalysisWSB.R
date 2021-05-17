@@ -250,6 +250,15 @@ for (row in 1:nrow(portfolio_stocks)) {
 #df with opening and closing prices
 stock_df = bind_rows(stock_price_list)
 
+stock_open = stock_df[seq(1, nrow(stock_df),2), c("symbol", "date", "open")]
+colnames(stock_open)[3] = "price"
+stock_close = stock_df[seq(2, nrow(stock_df),2), c("symbol", "date", "close")]
+colnames(stock_close)[3] = "price"
+
+cleand_df = rbind(stock_open, stock_close)
+cleand_df = cleand_df %>%
+  group_by(date, symbol) %>%
+  summarise(value = floor((1/(ncol(portfolio_stocks)-1)*10000)/price)*price)
 
 
 
