@@ -223,6 +223,7 @@ sentiment_portfolio <- reddit_sentiment_counts %>%
   group_by(Month, stock_mention) %>%
   summarise(n = sum(n), sentiment = mean(sentiment, na.rm = T)) %>%
   arrange(Month, -n) %>%
+  filter(sentiment > 0) %>%
   slice_head(n = 5) %>%
   mutate(id = row_number())
 
@@ -230,10 +231,8 @@ sentiment_portfolio <- reddit_sentiment_counts %>%
 portfolio_stocks = sentiment_portfolio %>%
   group_by(Month, stock_mention) %>%
   pivot_wider(id_cols = Month, names_from = id, values_from = stock_mention, names_sep = "")
-portfolio_stocks$Month = as.Date(paste(portfolio_stocks$Month,"-01",sep=""))
+portfolio_stocks$Month = as.Date(paste(portfolio_stocks$Month,"-01",sep=""))+31
 portfolio_stocks = as.data.frame(portfolio_stocks)
-
-
 
 
 #get value of five stocks each month (i.e. row) 
