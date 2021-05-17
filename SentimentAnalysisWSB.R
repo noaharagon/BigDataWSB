@@ -256,6 +256,7 @@ stock_df$value = NA
 # stock_close = stock_df[seq(2, nrow(stock_df),2), c("symbol", "date", "close")]
 # colnames(stock_close)[3] = "price"
 
+
 # cleand_df = rbind(stock_open, stock_close)
 # cleand_df = cleand_df %>%
 #   group_by(date, symbol) %>%
@@ -291,6 +292,14 @@ for (i in 1:118){
 }
 
 
+cleand_df = rbind(stock_open, stock_close)
+cleand_df = cleand_df %>%
+  group_by(date, symbol) %>%
+  summarise(value = floor((1/(ncol(portfolio_stocks)-1)*100000)/price)*price)
+
+cleand_df = cleand_df %>% 
+  group_by(date, value) %>%
+  summarise(gain = (sum(value)-sum(value))/sum(value))
 
 #plot sentiment of portfolio with value
 sentiment_portfolio %>%
@@ -340,4 +349,4 @@ for (i in unique(stocksss$symbol)){
 
 
 
-
+stock_df$value = floor((1/(ncol(portfolio_stocks)-1)*100000)/stock_df$open)*stock_df$open
