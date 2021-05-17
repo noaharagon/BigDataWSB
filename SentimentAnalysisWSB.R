@@ -170,7 +170,7 @@ for (i in LETTERS){
   }
 
 fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "ATH",
-        "IQ", "TDA", "IDE", "BE", "AM", "DSP", "FREE", "CC", LETTERS)
+        "IQ", "TDA", "IDE", "BE", "AM", "DSP", "FREE", "CC", "AMP", "VTIQ", LETTERS)
 
 #return the 5 most mentioned stocks by month
 monthly_top5 = reddit_mention_counts %>%
@@ -223,7 +223,7 @@ sentiment_portfolio <- reddit_sentiment_counts %>%
   group_by(Month, stock_mention) %>%
   summarise(n = sum(n), sentiment = mean(sentiment, na.rm = T)) %>%
   arrange(Month, -n) %>%
-  filter(sentiment > 0) %>%
+  # filter(sentiment > 0) %>%
   slice_head(n = 5) %>%
   mutate(id = row_number())
 
@@ -251,32 +251,14 @@ for (row in 1:nrow(portfolio_stocks)) {
 stock_df = bind_rows(stock_price_list)
 stock_df$value = NA
 
-# stock_open = stock_df[seq(1, nrow(stock_df),2), c("symbol", "date", "open")]
-# colnames(stock_open)[3] = "price"
-# stock_close = stock_df[seq(2, nrow(stock_df),2), c("symbol", "date", "close")]
-# colnames(stock_close)[3] = "price"
-
-
-# cleand_df = rbind(stock_open, stock_close)
-# cleand_df = cleand_df %>%
-#   group_by(date, symbol) %>%
-#   arrange(symbol)
-#
-# (cleand_df$price - lag(cleand_df$price))/lag(cleand_df$price)
-
-
-
-stock_df = arrange(stock_df, by = date)
-
-heese = stock_df %>%
-  group_by(date)%>%
-  count()
+stock_df = stock_df %>% 
+  arrange(date, symbol)
 
 pf_value <- 100000
 diff_pf <- 0
 
 k = 0
-for (i in 1:118){
+for (i in 1:120){
   k = k + 1 
   stock_df$value[i] <- floor((1/(ncol(portfolio_stocks)-1) * pf_value)/stock_df$open[i]) * stock_df$open[i]
   if (k == 5) {
@@ -290,16 +272,6 @@ for (i in 1:118){
     }
   }
 }
-
-
-cleand_df = rbind(stock_open, stock_close)
-cleand_df = cleand_df %>%
-  group_by(date, symbol) %>%
-  summarise(value = floor((1/(ncol(portfolio_stocks)-1)*100000)/price)*price)
-
-cleand_df = cleand_df %>% 
-  group_by(date, value) %>%
-  summarise(gain = (sum(value)-sum(value))/sum(value))
 
 #plot sentiment of portfolio with value
 sentiment_portfolio %>%
