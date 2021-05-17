@@ -13,6 +13,7 @@ library(chron)
 library(quantmod)
 library(tidyquant)
 library(pryr)
+library(compare)
 
 #setting working directory
 Paths = c("/Users/jonasschmitten/Downloads/Sentiment_Analysis_WSB", 
@@ -26,7 +27,7 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 1000000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
 #alternative? to check if fread skips rows
 #data = read.csv("wsb_comments_raw.csv",nrows=10000)
 #remove all columns where only NAs
@@ -199,6 +200,8 @@ sentiment_portfolio$Month = as.Date(paste(sentiment_portfolio$Month,"-01",sep=""
 sentiment_portfolio = as.data.frame(sentiment_portfolio)
 
 
+
+
 #get value of five stocks each month (i.e. row) 
 portfolio_value = vector("list", nrow(sentiment_portfolio)) #pre-allocate memory
 for (row in 1:nrow(sentiment_portfolio)) {
@@ -209,11 +212,31 @@ for (row in 1:nrow(sentiment_portfolio)) {
   portfolio_value[[row]] = stuff
 }
 
+#which stocks enter portfolio new, which ones do we hold
+stocks_held_list = vector("list", length = nrow(sentiment_portfolio))
+stocks_added_list = vector("list", length = nrow(sentiment_portfolio))
+for (row in 1:nrow(sentiment_portfolio)){
+  stocks_held = as.data.frame(sentiment_portfolio[row, which(sentiment_portfolio[row,] %in% sentiment_portfolio[row-1,])])
+  stocks_added = as.data.frame(sentiment_portfolio[row, which(!(sentiment_portfolio[row,] %in% sentiment_portfolio[row-1,]))])
+  stocks_held_list[[row]] = stocks_held
+  stocks_added_list[[row]] = stocks_added
+}
+
+stocks_held_df = bind_rows(stocks_held_list)
+stocks_added_df = bind_rows(stocks_added_list)
+
 #value of stocks as DataFrame
 value_of_stocks <- data.frame(matrix(unlist(portfolio_value), nrow=length(portfolio_value), byrow=TRUE))
 value_of_stocks$X1 = as.Date(value_of_stocks$X1)
 value_of_stocks$X2 = as.Date(value_of_stocks$X2)
 colnames(value_of_stocks) = c("Hold Begin", "Hold End", "Begin Price", "End Price")
+
+#calculate performance
+
+
+
+#get value of S&P500 as benchmark
+getSymbols("SPY", src = "yahoo", from = value_of_stocks[1,1], to = value_of_stocks[nrow(value_of_stocks),1])
 
 
 #plot sentiment over time
