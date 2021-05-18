@@ -1,4 +1,4 @@
-#Jonas Schmitten & Noah Angara & Desiree Tran
+#Jonas Schmitten & Noah Angara
 #Big Data Analytics
 #May 2021
 
@@ -31,7 +31,7 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 100000))
+data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
 #alternative? to check if fread skips rows
 #data = read.csv("wsb_comments_raw.csv",nrows=10000)
 #remove all columns where only NAs
@@ -98,9 +98,10 @@ vaderLexiconWSB <- vaderLexicon %>%
 # change lexicon to include new words
 vaderLexicon <- vaderLexiconWSB
 
+#manipulate package by saving sysdata file
 save(vaderLexicon, file ="vader/R/sysdata.rda")
 
-# remove the vader package and reinstall
+# remove the vader package and reinstall (might have to restart R session)
 detach("package:vader", unload = T)
 remove.packages("vader")
 #install package which contains the new words
@@ -125,6 +126,7 @@ reddit_mentions <- data %>%
   mutate(stock_mention = str_extract_all(body, reg_expression)) %>%
   unnest(cols = stock_mention)
 
+#remove data as we have all information in other df
 rm(data)
 gc()
 
@@ -137,11 +139,11 @@ word_cloud <- Corpus(VectorSource(reddit_mentions$body))
 word_cloud <- tm_map(word_cloud, content_transformer(tolower))
 # Remove numbers
 word_cloud <- tm_map(word_cloud, removeNumbers)
-# Remove english common stopwords
+# Remove english common stopwords as well as custom ones
 word_cloud <- tm_map(word_cloud, removeWords, stopwords("english"))
 word_cloud <- tm_map(word_cloud, removeWords, t(stop_words))
 word_cloud <- tm_map(word_cloud, removeWords, c("’", "finally", "making", "couple", "people", "feel", "time"))
-# Remove punctuations
+# Remove punctuation
 word_cloud <- tm_map(word_cloud, removePunctuation)
 # Eliminate extra white spaces
 word_cloud <- tm_map(word_cloud, stripWhitespace)
@@ -152,12 +154,16 @@ m <- as.matrix(dtm)
 v <- sort(rowSums(m),decreasing=TRUE)
 d <- data.frame(word = names(v),freq=v)
 
+#Geerate Word Cloud
 set.seed(1234)
 wordcloud(words = d$word, freq = d$freq, min.freq = 1,
           max.words=200, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"), scale = c(2,0.4))
 
+rm(stop_words, word_cloud, dtm, m, v, d)
+gc()
 
+#count number of stock mentions by day
 reddit_mention_counts <- reddit_mentions %>% 
   group_by(Date, stock_mention) %>% 
   count()
@@ -207,6 +213,7 @@ comments_sentiment = reddit_mentions %>%
 reddit_mentions = reddit_mentions %>%
   filter(stock_mention %in% unique(monthly_top5$stock_mention))
 
+#add sentiment to mention of ticker
 reddit_mentions_sentiment <- reddit_mentions %>% 
   left_join(comments_sentiment %>% select(-comment_clean),
             by = "body")
@@ -216,34 +223,39 @@ reddit_sentiment_counts <- reddit_mentions_sentiment %>%
   group_by(Date, stock_mention) %>% 
   summarise(sentiment = mean(sentiment, na.rm = T),
             n = n())
+rm(comments_sentiment, reddit_mentions, reddit_mentions_sentiment)
+gc()
 
 #create portfolio of stocks
-reddit_sentiment_counts$Month = format(as.Date(reddit_sentiment_counts$Date), "%Y-%m")
+#reddit_sentiment_counts$Month = format(as.Date(reddit_sentiment_counts$Date), "%Y-%m")
+reddit_sentiment_counts$Week = paste0(substr(reddit_sentiment_counts$Date, 1, 4), "-", strftime(reddit_sentiment_counts$Date, format = "%V"))
 sentiment_portfolio <- reddit_sentiment_counts %>%
-  group_by(Month, stock_mention) %>%
+  group_by(Week, stock_mention) %>%
   summarise(n = sum(n), sentiment = mean(sentiment, na.rm = T)) %>%
-  arrange(Month, -n) %>%
+  arrange(Week, -n) %>%
   # filter(sentiment > 0) %>%
   slice_head(n = 5) %>%
   mutate(id = row_number())
 
 #arrange df by stocks
 portfolio_stocks = sentiment_portfolio %>%
-  group_by(Month, stock_mention) %>%
-  pivot_wider(id_cols = Month, names_from = id, values_from = stock_mention, names_sep = "")
-portfolio_stocks$Month = ceiling_date(as.Date(paste(portfolio_stocks$Month,"-01",sep="")), "months")
+  group_by(Week, stock_mention) %>%
+  pivot_wider(id_cols = Week, names_from = id, values_from = stock_mention, names_sep = "")
+portfolio_stocks = na.locf(portfolio_stocks)
+portfolio_stocks$Week = ceiling_date(portfolio_stocks$Week, "week")
 portfolio_stocks = as.data.frame(portfolio_stocks)
 
+#add back to monthly format to get stock prices (tq_get need standard format)
+portfolio_stocks$Week = as.Date(paste(portfolio_stocks$Week, 1, sep="-"), "%Y-%U-%u")
 
-#get value of five stocks each month (i.e. row) 
+#get value of five stocks each period (i.e. row) 
 stock_price_list = vector("list", length = nrow(portfolio_stocks))
 for (row in 1:nrow(portfolio_stocks)) {
-  #if length == 0 we have no stocks in previous months top 5
   stock_prices = data.frame(tq_get(paste(portfolio_stocks[row, c(2:6)]), get = "stock.prices", 
-                                     from = portfolio_stocks[row, 1], to = ceiling_date(portfolio_stocks[row, 1], "month")-days(1))) %>%
+                                     from = portfolio_stocks[row, 1], to = ceiling_date(portfolio_stocks$Week[row], "week")-days(1))) %>%
     # get opening and closing prices
     group_by(symbol)%>%
-    # get beginning and end of month
+    # get beginning and end of period as we buy at beginning and sell at end
     filter(row_number() %in% c(1, n()))
   stock_price_list[[row]] = stock_prices
 }
@@ -254,9 +266,11 @@ stock_df$value = NA
 stock_df = stock_df %>% 
   arrange(date, symbol)
 
+#starting capital of investment strat
 pf_value <- 100000
 diff_pf <- 0
 
+#
 k = 0
 for (i in 1:nrow(stock_df)){
   k = k + 1 
@@ -273,10 +287,13 @@ for (i in 1:nrow(stock_df)){
   }
 }
 
-#calculate returns on a monthly returns
+#calculate returns on a monthly basis
 monthly_sum = stock_df %>%
   group_by(date) %>%
   summarise(sum_value = sum(value))
+
+#plot monthly value of portfolio
+ggplot(monthly_sum) + geom_line(aes(x = date, y = sum_value))
 
 #returns
 monthly_return = data.frame((monthly_sum$sum_value - lag(monthly_sum$sum_value))/lag(monthly_sum$sum_value))
@@ -291,8 +308,7 @@ sentiment_portfolio %>%
 
 
 #get value of S&P500 as benchmark
-getSymbols("SPY", src = "yahoo", from = value_of_stocks[1,1], to = value_of_stocks[nrow(value_of_stocks),1])
-
+getSymbols("SPY", src = "yahoo", from = monthly_sum$date[1], to = monthly_sum$date[nrow(monthly_sum)])
 
 #plot sentiment over time
 reddit_sentiment_counts %>% 
