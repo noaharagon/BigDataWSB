@@ -31,11 +31,13 @@ setwd(Paths[Sys.info()[7]])
 load("vader/R/sysdata.rda")
 
 #partially reading in data 
-data = as.data.frame(fread('wsb_comments_raw.csv', nrows = 10000))
+data = as.data.frame(fread('submissions_comments_noduplicates 2.csv', nrows = 1000000))
 #alternative? to check if fread skips rows
 #data = read.csv("wsb_comments_raw.csv",nrows=10000)
 #remove all columns where only NAs
 data = data[,colSums(is.na(data))<nrow(data)]
+
+data = select(data, body, created_utc)
 
 #remove columns with unimportant information. Check with unique() first 
 data = select(data, -c(author_flair_background_color, author_flair_css_class,author_flair_template_id,author_flair_text_color,
@@ -48,7 +50,6 @@ data = select(data, -c(author_flair_background_color, author_flair_css_class,aut
 #not sure about distinguished
 
 #convert UNIX to UTC
-
 data = data[order(data$created_utc),]
 
 #reset index after odering 
@@ -115,6 +116,9 @@ library(vader)
 
 #Get all stock tickers traded in the US
 stock_tickers = read.csv("stock_tickers.csv")
+stock_tickers = stock_tickers[stock_tickers$Market.Cap>300000000,]
+stock_tickers <- stock_tickers[!(stock_tickers$Symbol %in% c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "ATH",
+                                                            "IQ", "TDA", "IDE", "BE", "AM", "DSP", "FREE", "CC", "AMP", "VTIQ", "NOM", LETTERS)),]
 
 #CHECK WHICH STOCKS HAVE TICKERS SAME AS LETTERS AND IF RELEVANT TO KEEP
 reg_expression <- regex(paste0("\\b(?:",
@@ -301,50 +305,50 @@ monthly_return$Date = monthly_sum$date
 
 
 #plot sentiment of portfolio with value
-sentiment_portfolio %>%
-  group_by(Month) %>%
-  summarise(mean_sentiment = mean(sentiment, na.rm = T)) %>%
-  ggplot() + geom_line(aes(x = Month, y = mean_sentiment, group = 1))
-
-
-#get value of S&P500 as benchmark
-getSymbols("SPY", src = "yahoo", from = monthly_sum$date[1], to = monthly_sum$date[nrow(monthly_sum)])
-
-#plot sentiment over time
-reddit_sentiment_counts %>% 
-  filter(stock_mention %in% top5) %>% ggplot(aes(x = Date, y = sentiment, color = stock_mention)) +geom_smooth(se = F)
-
-
-# #Getting stock prices based on most mentioned stocks
-# getSymbols(sentiment_portfolio, src = "yahoo", from = '2020-02-02', to = '2021-05-10')
+# sentiment_portfolio %>%
+#   group_by(Month) %>%
+#   summarise(mean_sentiment = mean(sentiment, na.rm = T)) %>%
+#   ggplot() + geom_line(aes(x = Month, y = mean_sentiment, group = 1))
 # 
-# stock_prices = map(top5,function(x) Ad(get(x)))
-# stock_prices = reduce(stock_prices, merge)
-# colnames(stock_prices) = top5
 # 
-# #Remove unnecessary variables 
-# for (i in 1:length(top5)){
-#   rm(list = top5[i])
-# }
-
-
-
-
-
-stocksss = tq_get(c('AAPL', "MSFT"),get = "stock.prices", from ='2019-01-01', to = '2020-12-31')
-
-beginning_value = 0
-end_value = 0
-
-for (i in unique(stocksss$symbol)){
-  beginning_value = beginning_value + floor((1/(ncol(portfolio_stocks)-1)*10000)/stocksss[which(grepl(i, stocksss$symbol))[1],3])*stocksss[which(grepl(i, stocksss$symbol))[1],3]
-  
-  end_value = end_value + floor((1/(ncol(portfolio_stocks)-1)*10000)/stocksss[which(grepl(i, stocksss$symbol))[1],3])*
-    stocksss[which(grepl(i, stocksss$symbol))[length(which(grepl(i, stocksss$symbol)))],6]
-  }
-
-(end_value - beginning_value)/beginning_value
-
-
-
-stock_df$value = floor((1/(ncol(portfolio_stocks)-1)*100000)/stock_df$open)*stock_df$open
+# #get value of S&P500 as benchmark
+# getSymbols("SPY", src = "yahoo", from = monthly_sum$date[1], to = monthly_sum$date[nrow(monthly_sum)])
+# 
+# #plot sentiment over time
+# reddit_sentiment_counts %>% 
+#   filter(stock_mention %in% top5) %>% ggplot(aes(x = Date, y = sentiment, color = stock_mention)) +geom_smooth(se = F)
+# 
+# 
+# # #Getting stock prices based on most mentioned stocks
+# # getSymbols(sentiment_portfolio, src = "yahoo", from = '2020-02-02', to = '2021-05-10')
+# # 
+# # stock_prices = map(top5,function(x) Ad(get(x)))
+# # stock_prices = reduce(stock_prices, merge)
+# # colnames(stock_prices) = top5
+# # 
+# # #Remove unnecessary variables 
+# # for (i in 1:length(top5)){
+# #   rm(list = top5[i])
+# # }
+# 
+# 
+# 
+# 
+# 
+# stocksss = tq_get(c('AAPL', "MSFT"),get = "stock.prices", from ='2019-01-01', to = '2020-12-31')
+# 
+# beginning_value = 0
+# end_value = 0
+# 
+# for (i in unique(stocksss$symbol)){
+#   beginning_value = beginning_value + floor((1/(ncol(portfolio_stocks)-1)*10000)/stocksss[which(grepl(i, stocksss$symbol))[1],3])*stocksss[which(grepl(i, stocksss$symbol))[1],3]
+#   
+#   end_value = end_value + floor((1/(ncol(portfolio_stocks)-1)*10000)/stocksss[which(grepl(i, stocksss$symbol))[1],3])*
+#     stocksss[which(grepl(i, stocksss$symbol))[length(which(grepl(i, stocksss$symbol)))],6]
+#   }
+# 
+# (end_value - beginning_value)/beginning_value
+# 
+# 
+# 
+# stock_df$value = floor((1/(ncol(portfolio_stocks)-1)*100000)/stock_df$open)*stock_df$open
