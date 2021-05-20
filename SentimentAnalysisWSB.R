@@ -31,9 +31,9 @@ library(readr)
 setwd("/dev")
 
 #AWS Access key to access S3 bucket
-Sys.setenv("AWS_ACCESS_KEY_ID" = "AKIA6Q5URNQSIKSHRU54",
-           "AWS_SECRET_ACCESS_KEY" = "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",
-           "AWS_DEFAULT_REGION" = "eu-central-1")
+Sys.setenv("AWS_ACCESS_KEY_ID" = "",
+           "AWS_SECRET_ACCESS_KEY" = "",
+           "AWS_DEFAULT_REGION" = "")
 
 #Read in Data from Amazon S3 Bucket
 stock_tickers = aws.s3::s3read_using(read.csv, object = "s3://noahangara/stock_tickers.csv")
