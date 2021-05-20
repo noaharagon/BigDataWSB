@@ -1,8 +1,8 @@
-#Jonas Schmitten & Noah Angara
+#Jonas Schmitten and Noah Angara
 #Big Data Analytics
 #May 2021
 
-#packages
+#packages used (locally and on AWS)
 library(data.table)
 library(dplyr)
 library(anytime)
@@ -18,64 +18,83 @@ library(tm)
 library(SnowballC)
 library(wordcloud)
 library(RColorBrewer)
+library(zoo)
+library(lubridate)
+library(scales)
+library(aws.s3)
+library(readr)
 
-#setting working directory
-Paths = c("/Users/jonasschmitten/Downloads/Sentiment_Analysis_WSB", 
-          "/Users/noahangara/Downloads")
-names(Paths) = c("jonasschmitten", "noahangara")
-setwd(Paths[Sys.info()[7]])
 
-#download "source package" of vader under https://cran.r-project.org/web/packages/vader/index.html
-#make sure you put the source file into the same working directory
+# AWS Setup ---------------------------------------------------------------
 
-load("vader/R/sysdata.rda")
+#Default Home Directory of Rstudio on this AMI is limited to 10GB (we think) so need to change wd
+setwd("/dev")
 
-#partially reading in data 
-data = as.data.frame(fread('submissions_comments_noduplicates 2.csv', nrows = 1000000))
-#alternative? to check if fread skips rows
-#data = read.csv("wsb_comments_raw.csv",nrows=10000)
-#remove all columns where only NAs
-data = data[,colSums(is.na(data))<nrow(data)]
+#AWS Access key to access S3 bucket
+Sys.setenv("AWS_ACCESS_KEY_ID" = "AKIA6Q5URNQSIKSHRU54",
+           "AWS_SECRET_ACCESS_KEY" = "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",
+           "AWS_DEFAULT_REGION" = "eu-central-1")
 
-data = select(data, body, created_utc)
+#Read in Data from Amazon S3 Bucket
+stock_tickers = aws.s3::s3read_using(read.csv, object = "s3://noahangara/stock_tickers.csv")
+stock_tickers = stock_tickers[stock_tickers$Market.Cap>1000000000,]
 
-#remove columns with unimportant information. Check with unique() first 
-data = select(data, -c(author_flair_background_color, author_flair_css_class,author_flair_template_id,author_flair_text_color,
-                       author_flair_type, author_patreon_flair, awarders, gildings, locked, retrieved_on, send_replies, stickied, subreddit, 
-                       subreddit_id, treatment_tags, edited, author_cakeday))
+data = aws.s3::s3read_using(read_csv, object = "s3://noahangara/wsb_comments_raw.csv")
 
-#author_flair_text and author_flair_richtext basically the same?
-#what is no_follow?
-#what is score? upvotes?
-#not sure about distinguished
 
-#convert UNIX to UTC
+
+# Data Cleaning -----------------------------------------------------------
+
+#Select only Date Column and Body which contains the comments/posts
+data = data %>% select(body, created_utc)
+gc()
+
+#Remove NA's
+data = data %>% drop_na()
+gc()
+
+#order data by UNIX time
 data = data[order(data$created_utc),]
 
 #reset index after odering 
 row.names(data) <- NULL
 
+#convert UNIX to UTC time
 data$created_utc = anytime::utctime(data$created_utc)
 
-
-#countLines('wsb_comments_raw.csv')
+# remove 1969/1970 values as these contain no characters in body
+data = data[which(!grepl("1969", data$created_utc)), ]
+data = data[which(!grepl("1970", data$created_utc)), ]
+gc()
 
 #create date and time columns 
 data = add_column(data, Date = substr(data$created_utc, 1, 10),.before = 1)
 data = add_column(data, Time = substr(data$created_utc, 12, 19),.after = 1)
+gc()
 
 #drop no longer needed column
-#data = select(data,-created_utc)
+data = data %>% select(-created_utc)
+gc()
 
 #change date and time formats
 data$Date = as.Date(data$Date)
 data$Time = times(data$Time)
 
+#order data by Date and Time
 data = data[order(data$Date, data$Time),]
 
 #reset index after ordering 
 row.names(data) <- NULL
-# Adding Words to Vader Dictionary ----------------------------------------
+
+#remove [deleted] and [removed]
+data = data[which(data$body != "[removed]"), ]
+data = data[which(data$body != "[deleted]"), ]
+gc()
+
+#partition data into 2018, 2019, 2020, 2021
+data2018 = data[which(grepl("2018", data$Date)),]
+
+# Adjustment to Sentiment Dictionary ----------------------------------------
 
 # let's add some words to the dictionary that are specific to WSB
 wsbLexicon <- bind_rows(tibble(V1 = c("retard", "retarded", "fuck", "fucking", "autist", "fag", "faggot", "gay", "stonk", "porn", 
@@ -110,7 +129,7 @@ install.packages("vader/", repos = NULL, type = "source")
 #load the new package
 library(vader)
 
-#TEXT NORMALISATION -----------------------------------------------------------------------------------------
+#Sentiment/Mentions of Tickers -----------------------------------------------------------------------------------------
 #data$body = toupper(data$body)
 
 
@@ -126,45 +145,15 @@ reg_expression <- regex(paste0("\\b(?:",
                                ")\\b"))
 #paste(paste(stock_tickers$Symbol, collapse = "|"), paste(word(stock_tickers$Name), collapse = "|"), collapes = "|")
 
-reddit_mentions <- data %>%
+
+#get comments with stock tickers
+reddit_mentions <- data.table(data) %>%
   mutate(stock_mention = str_extract_all(body, reg_expression)) %>%
   unnest(cols = stock_mention)
 
+
 #remove data as we have all information in other df
 rm(data)
-gc()
-
-#read stopwords text
-stop_words = read_tsv("stop_words_english.txt")
-
-#Create Word Cloud of Comments
-word_cloud <- Corpus(VectorSource(reddit_mentions$body))
-# Convert the text to lower case
-word_cloud <- tm_map(word_cloud, content_transformer(tolower))
-# Remove numbers
-word_cloud <- tm_map(word_cloud, removeNumbers)
-# Remove english common stopwords as well as custom ones
-word_cloud <- tm_map(word_cloud, removeWords, stopwords("english"))
-word_cloud <- tm_map(word_cloud, removeWords, t(stop_words))
-word_cloud <- tm_map(word_cloud, removeWords, c("’", "finally", "making", "couple", "people", "feel", "time"))
-# Remove punctuation
-word_cloud <- tm_map(word_cloud, removePunctuation)
-# Eliminate extra white spaces
-word_cloud <- tm_map(word_cloud, stripWhitespace)
-
-#Add Elements to matrix and count number of words
-dtm <- TermDocumentMatrix(word_cloud)
-m <- as.matrix(dtm)
-v <- sort(rowSums(m),decreasing=TRUE)
-d <- data.frame(word = names(v),freq=v)
-
-#Geerate Word Cloud
-set.seed(1234)
-wordcloud(words = d$word, freq = d$freq, min.freq = 1,
-          max.words=200, random.order=FALSE, rot.per=0.35, 
-          colors=brewer.pal(8, "Dark2"), scale = c(2,0.4))
-
-rm(stop_words, word_cloud, dtm, m, v, d)
 gc()
 
 #count number of stock mentions by day
@@ -179,6 +168,7 @@ for (i in LETTERS){
   print(stock_tickers%>%filter(stock_tickers$Symbol == i))
   }
 
+#False Positive Stocks (have tickers but most likely not what is meant)
 fp <- c("RH", "DD", "CEO", "IMO", "EV", "PM", "TD", "ALL", "USA", "IT", "EOD", "ATH",
         "IQ", "TDA", "IDE", "BE", "AM", "DSP", "FREE", "CC", "AMP", "VTIQ", "NOM", LETTERS)
 
@@ -230,12 +220,13 @@ reddit_sentiment_counts <- reddit_mentions_sentiment %>%
 rm(comments_sentiment, reddit_mentions, reddit_mentions_sentiment)
 gc()
 
+
+# Create Portfolio from Comments ------------------------------------------
 #create portfolio of stocks
-#reddit_sentiment_counts$Month = format(as.Date(reddit_sentiment_counts$Date), "%Y-%m")
-reddit_sentiment_counts$Week = paste0(substr(reddit_sentiment_counts$Date, 1, 4), "-", strftime(reddit_sentiment_counts$Date, format = "%V"))
-sentiment_portfolio <- reddit_sentiment_counts %>%
+reddit_mention_counts$Week = paste0(substr(reddit_mention_counts$Date, 1, 4), "-", strftime(reddit_mention_counts$Date, format = "%V"))
+sentiment_portfolio <- reddit_mention_counts %>%
   group_by(Week, stock_mention) %>%
-  summarise(n = sum(n), sentiment = mean(sentiment, na.rm = T)) %>%
+  summarise(n = sum(n)) %>%
   arrange(Week, -n) %>%
   # filter(sentiment > 0) %>%
   slice_head(n = 5) %>%
@@ -246,16 +237,19 @@ portfolio_stocks = sentiment_portfolio %>%
   group_by(Week, stock_mention) %>%
   pivot_wider(id_cols = Week, names_from = id, values_from = stock_mention, names_sep = "")
 portfolio_stocks = na.locf(portfolio_stocks)
-portfolio_stocks$Week = ceiling_date(portfolio_stocks$Week, "week")
 portfolio_stocks = as.data.frame(portfolio_stocks)
 
 #add back to monthly format to get stock prices (tq_get need standard format)
 portfolio_stocks$Week = as.Date(paste(portfolio_stocks$Week, 1, sep="-"), "%Y-%U-%u")
+portfolio_stocks = read_csv("portfolio_stocks.csv")
+portfolio_stocks$Week[152] = as.Date("2021-01-02") #add missing date
+portfolio_stocks$Week[160] = as.Date("2021-02-22") #add missing date
+portfolio_stocks = data.frame(portfolio_stocks)
 
 #get value of five stocks each period (i.e. row) 
 stock_price_list = vector("list", length = nrow(portfolio_stocks))
 for (row in 1:nrow(portfolio_stocks)) {
-  stock_prices = data.frame(tq_get(paste(portfolio_stocks[row, c(2:6)]), get = "stock.prices", 
+  stock_prices = data.frame(tq_get(paste(portfolio_stocks[row, c(2:11)]), get = "stock.prices", 
                                      from = portfolio_stocks[row, 1], to = ceiling_date(portfolio_stocks$Week[row], "week")-days(1))) %>%
     # get opening and closing prices
     group_by(symbol)%>%
@@ -267,41 +261,93 @@ for (row in 1:nrow(portfolio_stocks)) {
 stock_df = bind_rows(stock_price_list)
 stock_df$value = NA
 
+#arrange df by date and ticker
 stock_df = stock_df %>% 
   arrange(date, symbol)
 
-#starting capital of investment strat
+#some dates do not contain 10 stocks, problematic for loop below
+stock_df = stock_df[which(!(grepl("2019-03-18", stock_df$date))),]
+stock_df = stock_df[which(!(grepl("2019-03-22", stock_df$date))),]
+stock_df = stock_df %>%
+  select(-stock.prices)
+
+#starting capital of investment strategy
 pf_value <- 100000
 diff_pf <- 0
 
-#
+#Loop to Calculate Portfolio Value iteratively
 k = 0
 for (i in 1:nrow(stock_df)){
   k = k + 1 
   stock_df$value[i] <- floor((1/(ncol(portfolio_stocks)-1) * pf_value)/stock_df$open[i]) * stock_df$open[i]
-  if (k == 5) {
-    diff_pf <- pf_value - sum(stock_df$value[(i-4):i])
+  if (k == 10) {
+    diff_pf <- pf_value - sum(stock_df$value[(i-9):i])
   }
-  if (k > 5 ) {
-    stock_df$value[i] <- floor((1/(ncol(portfolio_stocks)-1) * pf_value)/stock_df$open[i-5]) * stock_df$close[i]
-    if (k == 10) {
-      pf_value <- sum(stock_df$value[(i-4):i]) + diff_pf
+  if (k > 10 ) {
+    stock_df$value[i] <- floor((1/(ncol(portfolio_stocks)-1) * pf_value)/stock_df$open[i-10]) * stock_df$close[i]
+    if (k == 20) {
+      pf_value <- sum(stock_df$value[(i-9):i]) + diff_pf
       k = 0 
     }
   }
 }
 
-#calculate returns on a monthly basis
+#calculate value of portfolio on a monthly basis
 monthly_sum = stock_df %>%
   group_by(date) %>%
-  summarise(sum_value = sum(value))
+  summarise(reddit_portfolio = sum(value))
 
-#plot monthly value of portfolio
-ggplot(monthly_sum) + geom_line(aes(x = date, y = sum_value))
+#Pull SPY as a benchmark against reddit portfolio
+getSymbols("SPY", from = "2018-01-08", to = "2021-02-26")
+SPY = SPY[monthly_sum$date, ]
+monthly_sum = head(monthly_sum, 315)
+monthly_sum$SPY = SPY*365.8848 #scale to value of reddit portfolio (100'000)
+monthly_sum = melt(monthly_sum, "date")
 
-#returns
-monthly_return = data.frame((monthly_sum$sum_value - lag(monthly_sum$sum_value))/lag(monthly_sum$sum_value))
-monthly_return$Date = monthly_sum$date
+
+
+# Visualization of Results ------------------------------------------------
+
+#plot monthly value of reddit portfolio vs benchmark
+ggplot(monthly_sum) + geom_line(aes(x = date, y = value, color = variable)) + 
+  scale_y_continuous(labels = comma)
+
+#read stopwords text
+stop_words = read_tsv("stop_words_english.txt")
+
+#Create Word Cloud of Comments
+word_cloud <- Corpus(VectorSource(reddit_mentions$body))
+# Convert the text to lower case
+word_cloud <- tm_map(word_cloud, content_transformer(tolower))
+# Remove numbers
+word_cloud <- tm_map(word_cloud, removeNumbers)
+# Remove english common stopwords as well as custom ones
+word_cloud <- tm_map(word_cloud, removeWords, stopwords("english"))
+word_cloud <- tm_map(word_cloud, removeWords, t(stop_words))
+word_cloud <- tm_map(word_cloud, removeWords, c("’", "finally", "making", "couple", "people", "feel", "time"))
+# Remove punctuation
+word_cloud <- tm_map(word_cloud, removePunctuation)
+# Eliminate extra white spaces
+word_cloud <- tm_map(word_cloud, stripWhitespace)
+
+#Add Elements to matrix and count number of words
+dtm <- TermDocumentMatrix(word_cloud)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+
+#Generate Word Cloud
+set.seed(1234)
+wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"), scale = c(2,0.4))
+
+rm(stop_words, word_cloud, dtm, m, v, d)
+gc()
+
+#plot number of comments per day
+ggplot(data) + aes(x = Date) + 
+  geom_bar() + scale_y_continuous(labels = comma)
 
 
 #plot sentiment of portfolio with value
@@ -311,44 +357,8 @@ monthly_return$Date = monthly_sum$date
 #   ggplot() + geom_line(aes(x = Month, y = mean_sentiment, group = 1))
 # 
 # 
-# #get value of S&P500 as benchmark
-# getSymbols("SPY", src = "yahoo", from = monthly_sum$date[1], to = monthly_sum$date[nrow(monthly_sum)])
 # 
 # #plot sentiment over time
 # reddit_sentiment_counts %>% 
 #   filter(stock_mention %in% top5) %>% ggplot(aes(x = Date, y = sentiment, color = stock_mention)) +geom_smooth(se = F)
 # 
-# 
-# # #Getting stock prices based on most mentioned stocks
-# # getSymbols(sentiment_portfolio, src = "yahoo", from = '2020-02-02', to = '2021-05-10')
-# # 
-# # stock_prices = map(top5,function(x) Ad(get(x)))
-# # stock_prices = reduce(stock_prices, merge)
-# # colnames(stock_prices) = top5
-# # 
-# # #Remove unnecessary variables 
-# # for (i in 1:length(top5)){
-# #   rm(list = top5[i])
-# # }
-# 
-# 
-# 
-# 
-# 
-# stocksss = tq_get(c('AAPL', "MSFT"),get = "stock.prices", from ='2019-01-01', to = '2020-12-31')
-# 
-# beginning_value = 0
-# end_value = 0
-# 
-# for (i in unique(stocksss$symbol)){
-#   beginning_value = beginning_value + floor((1/(ncol(portfolio_stocks)-1)*10000)/stocksss[which(grepl(i, stocksss$symbol))[1],3])*stocksss[which(grepl(i, stocksss$symbol))[1],3]
-#   
-#   end_value = end_value + floor((1/(ncol(portfolio_stocks)-1)*10000)/stocksss[which(grepl(i, stocksss$symbol))[1],3])*
-#     stocksss[which(grepl(i, stocksss$symbol))[length(which(grepl(i, stocksss$symbol)))],6]
-#   }
-# 
-# (end_value - beginning_value)/beginning_value
-# 
-# 
-# 
-# stock_df$value = floor((1/(ncol(portfolio_stocks)-1)*100000)/stock_df$open)*stock_df$open
