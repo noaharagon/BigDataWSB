@@ -20,7 +20,7 @@ zip_links <- fec_page %>% #get all links for the zip files
   html_nodes(xpath="//*[@id='content']/ul[1]") %>% html_nodes("a") %>%
   html_attr("href")
 
-#set timeout option to download files
+#increase timeout option to download files (default is 60)
 getOption("timeout")
 options(timeout = 1000)
 
