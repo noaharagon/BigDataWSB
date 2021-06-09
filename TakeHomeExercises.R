@@ -35,13 +35,14 @@ options(timeout = 1000)
 #RUNTIME : ~9 minutes (depends on network speed)
 download.file(zip_links, basename(zip_links), method="libcurl")
 #unzip and remove zip files
-sapply(basename(zip_links), function(x)gunzip(x))
+lapply(basename(zip_links), function(x)unzip(x, exdir = getwd()))
+file.remove(c(basename(zip_links), "README"))
 gc()
 
 #combine csv files into one (only reading one file into memory at a time)
 #RUNTIME: ~7.83 minutes
 beginning <- Sys.time()
-files <- list.files(pattern = ".csv")
+files <- list.files(pattern = ".csv$")
 for (i in files) {
   d <- vroom(i, num_threads = detectCores())
   gc()
@@ -54,3 +55,12 @@ ending <- Sys.time()
 #RUNTIME: ~3.5 minutes
 gzip("fec.csv", destname = "fec.csv.zip")
 file.remove(list.files(pattern = "contributions"))
+
+
+# Task 2 ------------------------------------------------------------------
+library(RSQLite)
+
+#Create in-memory SQLite database
+con <- dbConnect(RSQLite::SQLite(), ":memory:")
+
+
