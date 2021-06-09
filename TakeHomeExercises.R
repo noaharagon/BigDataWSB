@@ -16,7 +16,7 @@ library(data.table)
 
 # Task 1 ------------------------------------------------------------------
 # set working directory according to who is executing the code
-Paths = c("/Users/jonasschmitten/Desktop/GitHub/BigDataWSB",
+Paths = c("/Users/jonasschmitten/Downloads/GitHub/take-home-exercises-team-send-it/data",
           "/Users/noahangara/Documents/GitHub/take-home-exercises-team-send-it/data")
 names(Paths) = c("jonasschmitten", "noahangara")
 setwd(Paths[Sys.info()[7]])
@@ -58,9 +58,17 @@ file.remove(list.files(pattern = "contributions"))
 
 
 # Task 2 ------------------------------------------------------------------
+
+#required libraries
 library(RSQLite)
+library(htmltab)
+
+#Download additional data
+transactions <- htmltab(doc = "https://www.fec.gov/campaign-finance-data/transaction-type-code-descriptions/"
+                        , which = '//*[@id="main"]/article/div/div/div/div[2]/div/table')
+
+industrycodes <- read.csv(url("http://assets.transparencydata.org.s3.amazonaws.com/docs/catcodes.csv"))
 
 #Create in-memory SQLite database
 con <- dbConnect(RSQLite::SQLite(), ":memory:")
-
 
