@@ -96,5 +96,13 @@ dbWriteTable(con, "industrycodes", industrycodes, field.types = c(
   industry = "varchar(50)",
   order = "varchar(3)"))
 
+#Create index for those variables needed in later analysis (makes retrieval more efficient)
+#For transaction type data
+
+dbExecute(con, 'CREATE INDEX index_transaction ON transactiontypes (Type,Description);')
+#For industry code data
+
+dbExecute(con, 'CREATE INDEX index_industry ON industrycodes (source, code, name, industry);')
+
 #Create table for donations"
 dbWriteTable(con, "donations", "fec.csv")
