@@ -62,13 +62,39 @@ file.remove(list.files(pattern = "contributions"))
 #required libraries
 library(RSQLite)
 library(htmltab)
+library(R.utils)
+
+# set working directory according to who is executing the code
+Paths = c("/Users/jonasschmitten/Downloads/GitHub/take-home-exercises-team-send-it/data",
+          "/Users/noahangara/Documents/GitHub/take-home-exercises-team-send-it/data")
+names(Paths) = c("jonasschmitten", "noahangara")
+setwd(Paths[Sys.info()[7]])
 
 #Download additional data
 transactions <- htmltab(doc = "https://www.fec.gov/campaign-finance-data/transaction-type-code-descriptions/"
                         , which = '//*[@id="main"]/article/div/div/div/div[2]/div/table')
+colnames(transactions) <- c("Type", "Description")
 
-industrycodes <- read.csv(url("http://assets.transparencydata.org.s3.amazonaws.com/docs/catcodes.csv"))
+industrycodes <- read.csv("http://assets.transparencydata.org.s3.amazonaws.com/docs/catcodes.csv")
+
+#unzip fec.csv
+R.utils:::gunzip("fec.csv.zip", destname = "fec.csv")
 
 #Create in-memory SQLite database
 con <- dbConnect(RSQLite::SQLite(), ":memory:")
+
+#Create table for transaction types
+dbWriteTable(con, "transactiontypes", transactions, field.types = c(
+  Type = "varchar(3)",
+  Description = "text"))
+
+#Create table for industry 
+dbWriteTable(con, "industrycodes", industrycodes, field.types = c(
+  source = "varchar(3)",
+  code = "varchar(5)",
+  name = "varchar(96)",
+  industry = "varchar(50)",
+  order = "varchar(3)"))
+
+#Create table for donations"
 
