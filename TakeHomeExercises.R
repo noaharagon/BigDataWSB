@@ -42,12 +42,12 @@ gc()
 #combine csv files into one (only reading one file into memory at a time)
 #RUNTIME: ~7 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores
 beginning <- Sys.time()
-files <- list.files(pattern = ".csv$")
+files <- list.files(pattern = "contribution")
 for (i in files) {
   d <- vroom(i, num_threads = detectCores(), na = c("", "NA", " "))
   gc()
   first <- i == list.files(pattern = "contribution")[1]
-  fwrite(d, "fec.csv", nThread = detectCores(), append = !first, na = NA , quote = FALSE, row.names = FALSE)
+  fwrite(d, "fec.csv", nThread = detectCores(), sep = "~", append = !first, na = NA)
 }
 ending <- Sys.time()
 
@@ -105,4 +105,4 @@ dbExecute(con, 'CREATE INDEX index_transaction ON transactiontypes (Type,Descrip
 dbExecute(con, 'CREATE INDEX index_industry ON industrycodes (source, code, name, industry);')
 
 #Create table for donations"
-dbWriteTable(con, "donations", "fec.csv")
+dbWriteTable(con, name = "donations", value = "fec.csv", sep = "~")
