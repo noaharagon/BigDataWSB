@@ -29,7 +29,7 @@ zip_links <- fec_page %>% #get all links for the zip files by contribution year
 
 #increase timeout option to download files (default is 60)
 getOption("timeout")
-options(timeout = 1000)
+options(timeout = 2000)
 
 #download zip files
 #RUNTIME : ~9 minutes (depends on network speed) on Macbook Air 2017 i7 8GB RAM
@@ -40,14 +40,14 @@ file.remove(c(basename(zip_links), "README"))
 gc()
 
 #combine csv files into one (only reading one file into memory at a time)
-#RUNTIME: ~7.29 minutes on Macbook Air 2017 i7 8GB RAM
+#RUNTIME: ~7 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores
 beginning <- Sys.time()
 files <- list.files(pattern = ".csv$")
 for (i in files) {
   d <- vroom(i, num_threads = detectCores(), na = c("", "NA", " "))
   gc()
   first <- i == list.files(pattern = "contribution")[1]
-  fwrite(d, "fec.csv", nThread = detectCores(), append = !first, na = c("", "NA", " "))
+  fwrite(d, "fec.csv", nThread = detectCores(), append = !first, na = NA , quote = FALSE, row.names = FALSE)
 }
 ending <- Sys.time()
 
@@ -81,7 +81,7 @@ industrycodes <- read.csv("http://assets.transparencydata.org.s3.amazonaws.com/d
 R.utils:::gunzip("fec.csv.zip", destname = "fec.csv")
 
 #Create in-memory SQLite database
-con <- dbConnect(RSQLite::SQLite(), ":memory:")
+con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
 
 #Create table for transaction types
 dbWriteTable(con, "transactiontypes", transactions, field.types = c(
