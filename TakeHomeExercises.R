@@ -41,7 +41,7 @@ gc()
 
 #combine csv files into one (only reading one file into memory at a time)
 #RUNTIME: ~7 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores (all covariates)
-#         ~2.11 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores (relevant columns)
+#         ~1.97 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores (relevant columns)
 beginning <- Sys.time()
 files <- list.files(pattern = "contribution")
 for (i in files) {
@@ -53,7 +53,7 @@ for (i in files) {
                                                                               "contributor_category"))
   gc()
   first <- i == list.files(pattern = "contribution")[1]
-  fwrite(d, "fec.csv", nThread = detectCores(), sep = "\t", quote = T, append = !first, na = NA)
+  fwrite(d, "fec.csv", nThread = detectCores(), sep = "\t", quote = F, append = !first, na = NA)
 }
 ending <- Sys.time()
 
@@ -86,7 +86,7 @@ industrycodes <- read.csv("http://assets.transparencydata.org.s3.amazonaws.com/d
 #unzip fec.csv
 R.utils:::gunzip("fec.csv.zip", destname = "fec.csv")
 
-#Create in-memory SQLite database
+#Create SQLite database called fec.sqlite
 con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
 
 #Create table for transaction types
@@ -102,13 +102,49 @@ dbWriteTable(con, "industrycodes", industrycodes, field.types = c(
   industry = "varchar(50)",
   order = "varchar(3)"))
 
+#Create table for donations
+dbWriteTable(con, "donations", "fec.csv", sep = "\t", field.types = c(
+  cycle = "int",
+  amount = "real",
+  contributor_category = "varchar(5)",
+  recipient_party = "varchar(3)",
+  recipient_name = "varchar(50)",
+  recipient_state = "varchar(2)"
+))
+
 #Create index for those variables needed in later analysis (makes retrieval more efficient)
 #For transaction type data
-
 dbExecute(con, 'CREATE INDEX index_transaction ON transactiontypes (Type,Description);')
-#For industry code data
 
+#For industry code data
 dbExecute(con, 'CREATE INDEX index_industry ON industrycodes (source, code, name, industry);')
 
-#Create table for donations
-dbWriteTable(con, "donations", "fec.csv", sep = "\t")
+
+# Task 3 ------------------------------------------------------------------
+
+#required libraries
+library(RSQLite)
+library(ggplot2)
+library(dplyr)
+
+#connect to database
+con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
+
+#query all donations from OIL & GAS where donation amount is positive
+oil_and_gas <- dbGetQuery(con, 'SELECT cycle, amount FROM donations WHERE contributor_category in ("E1100",
+"E1120", "E1130", "E1140", "E1150", "E1160", "E1170", "E1180", "E1190") AND amount > 0')
+
+#query sum of total donations by year
+total_contributions <- dbGetQuery(con, "SELECT cycle, 
+                                  SUM (amount) 
+                                  FROM donations
+                                  GROUP BY cycle")
+
+#dataframe with total and relative contributions
+contribution_plot <- data.frame(
+  absolute = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount)),
+  relative = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount))/total_contributions$`SUM (amount)`)
+
+#create bar plot
+ggplot(data = oil_and_gas) + geom_bar(aes(x = cycle, y = amount), stat = "identity")
+
