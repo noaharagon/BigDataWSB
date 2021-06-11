@@ -194,6 +194,7 @@ library(stargazer)
 library(dplyr)
 library(knitr)
 library(lfe)
+library(parallel)
 
 #connect to fec.sqplite database
 con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
@@ -213,10 +214,40 @@ fixed_reg_data <- fixed_reg_data %>%
   select(-recipient_party)
 
 #MODEL (1)
-felm(total_amount ~ republican, fixed_reg_data)
+model1 <- felm(total_amount ~ republican, fixed_reg_data)
+summary(model1, robust = T)
 
 #MODEL (2)
-felm(total_amount ~ republican | recipient_state, fixed_reg_data)
+model2 <- felm(total_amount ~ republican | recipient_state |0| recipient_state, fixed_reg_data)
+summary(model2)
 
-#MODEL ()
-felm(total_amount ~ republican | recipient_state + cycle, fixed_reg_data)
+#MODEL (3)
+model3 <- felm(total_amount ~ republican | recipient_state + cycle, fixed_reg_data)
+
+# set the seed 
+set.seed(12695)
+bootstrap_fe <- getfe(
+  model3,
+  se = FALSE,
+  method = "kaczmarz",
+  ef = "ref",
+  bN = 100,
+  robust = FALSE,
+  cluster = model3[["cycle"]]
+)
+
+bootstrap_se <- btrap(
+  bootstrap_fe,
+  model3,
+  N = 100,
+  threads = detectCores(),
+  cluster = model3[["cycle"]]
+)
+
+
+#present results in table
+stargazer(model1, model2, model3, header = F, df = F, title = 'Results Fixed Effects Models', align = T, dep.var.labels = 'Amount', 
+          no.space = T, column.labels = c("Model 1", "Model 2", "Model 3"), covariate.labels=c('Republican', 'Intercept'), model.numbers=FALSE)
+
+
+
