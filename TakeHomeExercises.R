@@ -50,7 +50,8 @@ for (i in files) {
                                                                               "recipient_party",
                                                                               "recipient_name",
                                                                               "recipient_state",
-                                                                              "contributor_category"))
+                                                                              "contributor_category", 
+                                                                              "transaction_type"))
   gc()
   first <- i == list.files(pattern = "contribution")[1]
   fwrite(d, "fec.csv", nThread = detectCores(), sep = "\t", quote = F, append = !first, na = NA)
@@ -109,7 +110,8 @@ dbWriteTable(con, "donations", "fec.csv", sep = "\t", field.types = c(
   contributor_category = "varchar(5)",
   recipient_party = "varchar(3)",
   recipient_name = "varchar(50)",
-  recipient_state = "varchar(2)"
+  recipient_state = "varchar(2)",
+  transaction_type = "varchar(3)"
 ))
 
 #Create index for those variables needed in later analysis (makes retrieval more efficient)
@@ -135,7 +137,6 @@ con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
 #query all donations from OIL & GAS where donation amount is positive
 oil_and_gas <- dbGetQuery(con, 'SELECT cycle, amount FROM donations WHERE contributor_category in ("E1100",
 "E1120", "E1130", "E1140", "E1150", "E1160", "E1170", "E1180", "E1190") AND amount > 0')
-
 #query sum of total donations by year
 total_contributions <- dbGetQuery(con, "SELECT cycle, 
                                   SUM (amount) 
