@@ -104,6 +104,8 @@ dbWriteTable(con, "industrycodes", industrycodes, field.types = c(
   order = "varchar(3)"))
 
 #Create table for donations
+#RUNTIME: ~1.65 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores
+beginning <- Sys.time()
 dbWriteTable(con, "donations", "fec.csv", sep = "\t", field.types = c(
   cycle = "int",
   amount = "real",
@@ -113,6 +115,7 @@ dbWriteTable(con, "donations", "fec.csv", sep = "\t", field.types = c(
   recipient_state = "varchar(2)",
   transaction_type = "varchar(3)"
 ))
+end <- Sys.time()
 
 #Create index for those variables needed in later analysis (makes retrieval more efficient)
 #For transaction type data
@@ -122,7 +125,7 @@ dbExecute(con, 'CREATE INDEX index_transaction ON transactiontypes (Type,Descrip
 dbExecute(con, 'CREATE INDEX index_industry ON industrycodes (source, code, name, industry);')
 
 #For transaction data
-dbExecute(con, 'CREATE INDEX index_transaction ON donations (amount, cycle, contributor_category, recipient_party, recipient_name, recipient_state);')
+dbExecute(con, 'CREATE INDEX index_donation ON donations (amount, cycle, contributor_category, recipient_party, recipient_name, recipient_state);')
 
 # Task 3 ------------------------------------------------------------------
 
@@ -130,13 +133,19 @@ dbExecute(con, 'CREATE INDEX index_transaction ON donations (amount, cycle, cont
 library(RSQLite)
 library(ggplot2)
 library(dplyr)
+library(ggthemes)
 
 #connect to database
 con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
 
 #query all donations from OIL & GAS where donation amount is positive
-oil_and_gas <- dbGetQuery(con, 'SELECT cycle, amount FROM donations WHERE contributor_category in ("E1100",
-"E1120", "E1130", "E1140", "E1150", "E1160", "E1170", "E1180", "E1190") AND amount > 0')
+oil_and_gas <- dbGetQuery(con, "SELECT amount, cycle, transaction_type
+          FROM donations
+          INNER JOIN industrycodes
+          ON donations.contributor_category = industrycodes.code
+          WHERE industrycodes.industry = 'OIL & GAS'
+          AND donations.amount >0")
+
 #query sum of total donations by year
 total_contributions <- dbGetQuery(con, "SELECT cycle, 
                                   SUM (amount) 
@@ -146,8 +155,16 @@ total_contributions <- dbGetQuery(con, "SELECT cycle,
 #dataframe with total and relative contributions
 contribution_plot <- data.frame(
   absolute = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount)),
-  relative = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount))/total_contributions$`SUM (amount)`)
+  relative = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount))/total_contributions$`SUM (amount)`*100) %>%
+  select(c(1,2,4))
+colnames(contribution_plot) <- c("Cycle", "Absolute", "Relative (%)")
+contribution_plot <- melt(contribution_plot, "Cycle")
 
 #create bar plot
-ggplot(data = oil_and_gas) + geom_bar(aes(x = cycle, y = amount), stat = "identity")
+options(scipen=999)
+ggplot(data = contribution_plot) + 
+  geom_bar(aes(x = Cycle, y = value, fill = variable), stat = "identity", show.legend = FALSE) + 
+  facet_grid(variable ~ ., scales='free') + xlab("Cycle") + theme_fivethirtyeight()
+
+
 
