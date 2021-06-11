@@ -92,12 +92,12 @@ R.utils:::gunzip("fec.csv.zip", destname = "fec.csv")
 con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
 
 #Create table for transaction types
-dbWriteTable(con, "transactiontypes", transactions, field.types = c(
+dbWriteTable(con, "transactiontypes", transactions, overwrite = T, field.types = c(
   Type = "varchar(3)",
   Description = "text"))
 
 #Create table for industry 
-dbWriteTable(con, "industrycodes", industrycodes, field.types = c(
+dbWriteTable(con, "industrycodes", industrycodes, overwrite = T, field.types = c(
   source = "varchar(3)",
   code = "varchar(5)",
   name = "varchar(96)",
@@ -107,7 +107,7 @@ dbWriteTable(con, "industrycodes", industrycodes, field.types = c(
 #Create table for donations
 #RUNTIME: ~1.65 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores
 beginning <- Sys.time()
-dbWriteTable(con, "donations", "fec.csv", sep = "\t", field.types = c(
+dbWriteTable(con, "donations", "fec.csv", sep = "\t", overwrite = T, field.types = c(
   cycle = "int",
   amount = "real",
   contributor_category = "varchar(5)",
@@ -136,11 +136,12 @@ library(RSQLite)
 library(ggplot2)
 library(dplyr)
 library(ggthemes)
+library(knitr)
 
-#connect to database
+#connect to fec.sqplite database
 con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
 
-#query all donations from OIL & GAS where donation amount is positive
+#query all donations from OIL & GAS industry where donation amount is positive
 oil_and_gas <- dbGetQuery(con, "SELECT amount, cycle, transaction_type
           FROM donations
           INNER JOIN industrycodes
@@ -148,7 +149,7 @@ oil_and_gas <- dbGetQuery(con, "SELECT amount, cycle, transaction_type
           WHERE industrycodes.industry = 'OIL & GAS'
           AND donations.amount >0")
 
-#query sum of total donations by year
+#query sum of total donations by election cycle
 total_contributions <- dbGetQuery(con, "SELECT cycle, 
                                   SUM (amount) 
                                   FROM donations
@@ -160,13 +161,62 @@ contribution_plot <- data.frame(
   relative = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount))/total_contributions$`SUM (amount)`*100) %>%
   select(c(1,2,4))
 colnames(contribution_plot) <- c("Cycle", "Absolute", "Relative (%)")
-contribution_plot <- melt(contribution_plot, "Cycle")
+contribution_plot <- melt(contribution_plot, "Cycle")#for proper format into ggplot
 
-#create bar plot with relative 
+#create bar plot with relative and absolute donations from OIL & GAS
 options(scipen=999) #removes scientific notation for y-axis
 ggplot(data = contribution_plot) + 
   geom_bar(aes(x = Cycle, y = value, fill = variable), stat = "identity", show.legend = FALSE) + 
   facet_grid(variable ~ ., scales='free') + xlab("Cycle") + theme_fivethirtyeight()
 
+#query total donations by cycle, candidates and from OIL & GAS industry
+candidate_donations <- dbGetQuery(con, "SELECT SUM(amount) AS total_amount,
+                          cycle, recipient_name
+                          FROM donations
+                          INNER JOIN industrycodes
+                          ON donations.contributor_category = industrycodes.code
+                          WHERE industrycodes.industry = 'OIL & GAS' AND recipient_type = 'P' AND amount > 0
+                          GROUP BY cycle, recipient_name")
 
+#get top 5 candidates per election cycle and filter out NA's
+top_5_candidates <- candidate_donations %>% 
+  group_by(cycle) %>% 
+  filter(!(recipient_name == "NA")) %>% 
+  slice_max(total_amount, n = 5)
 
+kable(top_5_candidates, format = "html")
+
+# Task 4 ------------------------------------------------------------------
+
+#required libraries
+library(RSQLite)
+library(stargazer)
+library(dplyr)
+library(knitr)
+library(lfe)
+
+#connect to fec.sqplite database
+con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
+
+#generate analytic data set
+fixed_reg_data <- dbGetQuery(con, "SELECT SUM(amount) AS total_amount,
+                          cycle, recipient_name, recipient_party, recipient_state
+                          FROM donations
+                          INNER JOIN industrycodes
+                          ON donations.contributor_category = industrycodes.code
+                          WHERE industrycodes.industry = 'OIL & GAS' AND recipient_type = 'P' AND amount > 0
+                          GROUP BY cycle, recipient_name")
+
+#create dummy variable for republican
+fixed_reg_data <- fixed_reg_data %>% 
+  mutate(republican = ifelse(recipient_party == "R", 1, 0)) %>%
+  select(-recipient_party)
+
+#MODEL (1)
+felm(total_amount ~ republican, fixed_reg_data)
+
+#MODEL (2)
+felm(total_amount ~ republican | recipient_state, fixed_reg_data)
+
+#MODEL ()
+felm(total_amount ~ republican | recipient_state + cycle, fixed_reg_data)
