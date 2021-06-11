@@ -50,6 +50,7 @@ for (i in files) {
                                                                               "recipient_party",
                                                                               "recipient_name",
                                                                               "recipient_state",
+                                                                              "recipient_type",
                                                                               "contributor_category", 
                                                                               "transaction_type"))
   gc()
@@ -113,6 +114,7 @@ dbWriteTable(con, "donations", "fec.csv", sep = "\t", field.types = c(
   recipient_party = "varchar(3)",
   recipient_name = "varchar(50)",
   recipient_state = "varchar(2)",
+  recipient_type = "varchar(3)",
   transaction_type = "varchar(3)"
 ))
 end <- Sys.time()
@@ -125,7 +127,7 @@ dbExecute(con, 'CREATE INDEX index_transaction ON transactiontypes (Type,Descrip
 dbExecute(con, 'CREATE INDEX index_industry ON industrycodes (source, code, name, industry);')
 
 #For transaction data
-dbExecute(con, 'CREATE INDEX index_donation ON donations (amount, cycle, contributor_category, recipient_party, recipient_name, recipient_state);')
+dbExecute(con, 'CREATE INDEX index_donation ON donations (amount, cycle, contributor_category, recipient_party, recipient_name, recipient_state, recipient_type);')
 
 # Task 3 ------------------------------------------------------------------
 
@@ -152,7 +154,7 @@ total_contributions <- dbGetQuery(con, "SELECT cycle,
                                   FROM donations
                                   GROUP BY cycle")
 
-#dataframe with total and relative contributions
+#data cleaning dataframe with total and relative contributions
 contribution_plot <- data.frame(
   absolute = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount)),
   relative = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount))/total_contributions$`SUM (amount)`*100) %>%
@@ -160,8 +162,8 @@ contribution_plot <- data.frame(
 colnames(contribution_plot) <- c("Cycle", "Absolute", "Relative (%)")
 contribution_plot <- melt(contribution_plot, "Cycle")
 
-#create bar plot
-options(scipen=999)
+#create bar plot with relative 
+options(scipen=999) #removes scientific notation for y-axis
 ggplot(data = contribution_plot) + 
   geom_bar(aes(x = Cycle, y = value, fill = variable), stat = "identity", show.legend = FALSE) + 
   facet_grid(variable ~ ., scales='free') + xlab("Cycle") + theme_fivethirtyeight()
