@@ -1,0 +1,326 @@
+---
+title: "Research Report"
+subtitle: "Big Data Analytics Group Examination: Take-Home Exercises"
+author:
+- Author1 (Student ID)
+- Author2 (Student ID)
+- Author3 (Student ID)
+date: "14/06/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Group examination: Step-by-step implementation of data pipeline (max. 30 points)
+
+
+## Task 1: Data gathering
+
+### Solution
+
+```{r}
+
+# ADD YOUR SOLUTION CODE TO TASK 1 HERE
+
+#required libraries
+library(xml2)
+library(httr)
+library(rvest)
+library(dplyr)
+library(readr)
+library(vroom)
+library(parallel)
+library(R.utils)
+library(data.table)
+
+# set working directory according to who is executing the code
+Paths = c("/Users/jonasschmitten/Downloads/GitHub/take-home-exercises-team-send-it/data",
+          "/Users/noahangara/Documents/GitHub/take-home-exercises-team-send-it/data")
+names(Paths) = c("jonasschmitten", "noahangara")
+setwd(Paths[Sys.info()[7]])
+
+#get HTML links 
+fec_page <- read_html("https://sunlightlabs.github.io/datacommons/bulk_data.html")
+zip_links <- fec_page %>% #get all links for the zip files by contribution year
+  html_nodes(xpath="//*[@id='content']/ul[1]") %>% html_nodes("a") %>%
+  html_attr("href")
+
+#increase timeout option to download files (default is 60)
+getOption("timeout")
+options(timeout = 2000)
+
+#download zip files
+#RUNTIME : ~9 minutes (depends on network speed) on Macbook Air 2017 i7 8GB RAM
+download.file(zip_links, basename(zip_links), method="libcurl")
+#unzip and remove zip files
+lapply(basename(zip_links), function(x)unzip(x, exdir = getwd()))
+file.remove(c(basename(zip_links), "README"))
+gc()
+
+#combine csv files into one (only reading one file into memory at a time)
+#RUNTIME: ~7 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores (all covariates)
+#         ~1.97 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores (relevant columns)
+beginning <- Sys.time()
+files <- list.files(pattern = "contribution")
+for (i in files) {
+  d <- vroom(i, num_threads = detectCores(), na = c("", "NA"), col_select = c("cycle", "amount",
+                                                                              "contributor_category",
+                                                                              "recipient_party",
+                                                                              "recipient_name",
+                                                                              "recipient_state",
+                                                                              "recipient_type",
+                                                                              "contributor_category", 
+                                                                              "transaction_type"))
+  gc()
+  first <- i == list.files(pattern = "contribution")[1]
+  fwrite(d, "fec.csv", nThread = detectCores(), sep = "\t", quote = F, append = !first, na = NA)
+}
+ending <- Sys.time()
+
+#compress csv file and remove redundant files
+#RUNTIME: ~3.5 minutes on Macbook Air 2017 i7 8GB RAM
+gzip("fec.csv", destname = "fec.csv.zip")
+file.remove(list.files(pattern = "contributions"))
+
+```
+```
+
+### Exposition of the solution
+* Which approach did you take to import CSVs and how does it basically work?
+* What is the advantage of downloading the data set in individual parts (batches) instead of downloading
+the one large zip-file containing all observations at once?
+* The requirement of using zipping/file compression in the task you have just implemented has conse-
+quences for the computational resources needed to run this task. Which hardware component(s) are used more efficiently due to file compression in this task and which ones less efficiently (if any)?
+
+
+
+## Task 2: Data storage and databases
+
+### Solution
+
+```{r}
+
+# ADD YOUR SOLUTION CODE TO TASK 2 HERE
+
+#required libraries
+library(RSQLite)
+library(htmltab)
+library(R.utils)
+
+# set working directory according to who is executing the code
+Paths = c("/Users/jonasschmitten/Downloads/GitHub/take-home-exercises-team-send-it/data",
+          "/Users/noahangara/Documents/GitHub/take-home-exercises-team-send-it/data")
+names(Paths) = c("jonasschmitten", "noahangara")
+setwd(Paths[Sys.info()[7]])
+
+#Download additional data
+transactions <- htmltab(doc = "https://www.fec.gov/campaign-finance-data/transaction-type-code-descriptions/"
+                        , which = '//*[@id="main"]/article/div/div/div/div[2]/div/table')
+colnames(transactions) <- c("Type", "Description")
+
+industrycodes <- read.csv("http://assets.transparencydata.org.s3.amazonaws.com/docs/catcodes.csv")
+
+#unzip fec.csv
+R.utils:::gunzip("fec.csv.zip", destname = "fec.csv")
+
+#Create SQLite database called fec.sqlite
+con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
+
+#Create table for transaction types
+dbWriteTable(con, "transactiontypes", transactions, overwrite = T, field.types = c(
+  Type = "varchar(3)",
+  Description = "text"))
+
+#Create table for industry 
+dbWriteTable(con, "industrycodes", industrycodes, overwrite = T, field.types = c(
+  source = "varchar(3)",
+  code = "varchar(5)",
+  name = "varchar(96)",
+  industry = "varchar(50)",
+  order = "varchar(3)"))
+
+#Create table for donations
+#RUNTIME: ~1.65 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores
+beginning <- Sys.time()
+dbWriteTable(con, "donations", "fec.csv", sep = "\t", overwrite = T, field.types = c(
+  cycle = "int",
+  amount = "real",
+  contributor_category = "varchar(5)",
+  recipient_party = "varchar(3)",
+  recipient_name = "varchar(50)",
+  recipient_state = "varchar(2)",
+  recipient_type = "varchar(3)",
+  transaction_type = "varchar(3)"
+))
+end <- Sys.time()
+
+#Create index for those variables needed in later analysis (makes retrieval more efficient)
+#For transaction type data
+dbExecute(con, 'CREATE INDEX index_transaction ON transactiontypes (Type,Description);')
+
+#For industry code data
+dbExecute(con, 'CREATE INDEX index_industry ON industrycodes (source, code, name, industry);')
+
+#For transaction data
+dbExecute(con, 'CREATE INDEX index_donation ON donations (amount, cycle, contributor_category, recipient_party, recipient_name, recipient_state, recipient_type);')
+
+```
+
+### Exposition of the solution
+
+In the exposition of your solution, explain first why it makes sense to keep the three data sets in three different tables. Then explain what you did to optimize the database and (in simple terms) why your optimization improves the database in comparison to the same database without any optimization (all columns as TEXT and no indices). Is it faster? Does it use less storage space? why?
+
+
+
+## Task 3: Data aggregation and visualization
+
+### Solution
+
+```{r}
+
+# ADD YOUR SOLUTION CODE TO TASK 3 HERE
+
+#required libraries
+library(RSQLite)
+library(ggplot2)
+library(dplyr)
+library(ggthemes)
+library(knitr)
+
+#connect to fec.sqplite database
+con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
+
+#query all donations from OIL & GAS industry where donation amount is positive
+oil_and_gas <- dbGetQuery(con, "SELECT amount, cycle, transaction_type
+          FROM donations
+          INNER JOIN industrycodes
+          ON donations.contributor_category = industrycodes.code
+          WHERE industrycodes.industry = 'OIL & GAS'
+          AND donations.amount >0")
+
+#query sum of total donations by election cycle
+total_contributions <- dbGetQuery(con, "SELECT cycle, 
+                                  SUM (amount) 
+                                  FROM donations
+                                  GROUP BY cycle")
+
+#data cleaning dataframe with total and relative contributions
+contribution_plot <- data.frame(
+  absolute = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount)),
+  relative = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount))/total_contributions$`SUM (amount)`*100) %>%
+  select(c(1,2,4))
+colnames(contribution_plot) <- c("Cycle", "Absolute", "Relative (%)")
+contribution_plot <- melt(contribution_plot, "Cycle")#for proper format into ggplot
+
+#create bar plot with relative and absolute donations from OIL & GAS
+options(scipen=999) #removes scientific notation for y-axis
+ggplot(data = contribution_plot) + 
+  geom_bar(aes(x = Cycle, y = value, fill = variable), stat = "identity", show.legend = FALSE) + 
+  facet_grid(variable ~ ., scales='free') + xlab("Cycle") + theme_fivethirtyeight()
+
+#query total donations by cycle, candidates and from OIL & GAS industry
+candidate_donations <- dbGetQuery(con, "SELECT SUM(amount) AS total_amount,
+                          cycle, recipient_name
+                          FROM donations
+                          INNER JOIN industrycodes
+                          ON donations.contributor_category = industrycodes.code
+                          WHERE industrycodes.industry = 'OIL & GAS' AND recipient_type = 'P' AND amount > 0
+                          GROUP BY cycle, recipient_name")
+
+#get top 5 candidates per election cycle and filter out NA's
+top_5_candidates <- candidate_donations %>% 
+  group_by(cycle) %>% 
+  filter(!(recipient_name == "NA")) %>% 
+  slice_max(total_amount, n = 5)
+
+kable(top_5_candidates, format = "html")
+
+```
+
+### Exposition of the solution
+
+
+
+## Task 4: Regression analysis
+
+### Solution
+
+```{r}
+
+# ADD YOUR SOLUTION CODE TO TASK 4 HERE
+
+#required libraries
+library(RSQLite)
+library(stargazer)
+library(dplyr)
+library(knitr)
+library(lfe)
+library(parallel)
+
+#connect to fec.sqplite database
+con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
+
+#generate analytic data set
+fixed_reg_data <- dbGetQuery(con, "SELECT SUM(amount) AS total_amount,
+                          cycle, recipient_name, recipient_party, recipient_state
+                          FROM donations
+                          INNER JOIN industrycodes
+                          ON donations.contributor_category = industrycodes.code
+                          WHERE industrycodes.industry = 'OIL & GAS' AND recipient_type = 'P' AND amount > 0
+                          GROUP BY cycle, recipient_name")
+
+#create dummy variable for republican
+fixed_reg_data <- fixed_reg_data %>% 
+  mutate(republican = ifelse(recipient_party == "R", 1, 0)) %>%
+  select(-recipient_party)
+
+#MODEL (1)
+model1 <- felm(total_amount ~ republican, fixed_reg_data)
+summary(model1, robust = T)
+
+#MODEL (2)
+model2 <- felm(total_amount ~ republican | recipient_state |0| recipient_state, fixed_reg_data)
+summary(model2)
+
+#MODEL (3)
+model3 <- felm(total_amount ~ republican | recipient_state + cycle, fixed_reg_data)
+
+# set the seed 
+set.seed(12695)
+bootstrap_fe <- getfe(
+  model3,
+  se = FALSE,
+  method = "kaczmarz",
+  ef = "ref",
+  bN = 100,
+  robust = FALSE,
+  cluster = model3[["cycle"]]
+)
+
+bootstrap_se <- btrap(
+  bootstrap_fe,
+  model3,
+  N = 100,
+  threads = detectCores(),
+  cluster = model3[["cycle"]]
+)
+
+
+#present results in table
+stargazer(model1, model2, model3, header = F, df = F, title = 'Results Fixed Effects Models', align = T, dep.var.labels = 'Amount', 
+          no.space = T, column.labels = c("Model 1", "Model 2", "Model 3"), covariate.labels=c('Republican', 'Intercept'), model.numbers=FALSE)
+
+
+```
+
+### Exposition of the solution
+
+* From what we discussed in the lectures and from what you take from (Gaure 2013), why might the traditional approach to estimate specifications 2 and 3 (with sets of dummy variables for the fixed effects) with OLS (lm-function) be computationally more demanding than the approach implemented in the lfe-package?
+* *Extra point:* motivate briefly why you have chosen to use (which type of) cluster-robust standard errors (or why you have chosen not to use cluster-robust standard errors).
+
+
+
+
