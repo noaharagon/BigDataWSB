@@ -40,14 +40,20 @@ file.remove(c(basename(zip_links), "README"))
 gc()
 
 #combine csv files into one (only reading one file into memory at a time)
-#RUNTIME: ~7 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores
+#RUNTIME: ~7 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores (all covariates)
+#         ~2.11 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores (relevant columns)
 beginning <- Sys.time()
 files <- list.files(pattern = "contribution")
 for (i in files) {
-  d <- vroom(i, num_threads = detectCores(), na = c("", "NA", " "))
+  d <- vroom(i, num_threads = detectCores(), na = c("", "NA"), col_select = c("cycle", "amount",
+                                                                              "contributor_category",
+                                                                              "recipient_party",
+                                                                              "recipient_name",
+                                                                              "recipient_state",
+                                                                              "contributor_category"))
   gc()
   first <- i == list.files(pattern = "contribution")[1]
-  fwrite(d, "fec.csv", nThread = detectCores(), sep = "~", append = !first, na = NA)
+  fwrite(d, "fec.csv", nThread = detectCores(), sep = "\t", quote = T, append = !first, na = NA)
 }
 ending <- Sys.time()
 
@@ -104,5 +110,5 @@ dbExecute(con, 'CREATE INDEX index_transaction ON transactiontypes (Type,Descrip
 
 dbExecute(con, 'CREATE INDEX index_industry ON industrycodes (source, code, name, industry);')
 
-#Create table for donations"
-dbWriteTable(con, name = "donations", value = "fec.csv", sep = "~")
+#Create table for donations
+dbWriteTable(con, "donations", "fec.csv", sep = "\t")
