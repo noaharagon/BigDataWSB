@@ -119,6 +119,8 @@ dbExecute(con, 'CREATE INDEX index_transaction ON transactiontypes (Type,Descrip
 #For industry code data
 dbExecute(con, 'CREATE INDEX index_industry ON industrycodes (source, code, name, industry);')
 
+#For transaction data
+dbExecute(con, 'CREATE INDEX index_transaction ON donations (amount, cycle, contributor_category, recipient_party, recipient_name, recipient_state);')
 
 # Task 3 ------------------------------------------------------------------
 
