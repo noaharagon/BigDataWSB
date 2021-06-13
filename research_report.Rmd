@@ -86,14 +86,14 @@ gzip("fec.csv", destname = "fec.csv.zip")
 file.remove(list.files(pattern = "contributions"))
 
 ```
-```
 
 ### Exposition of the solution
 * Which approach did you take to import CSVs and how does it basically work?
-* What is the advantage of downloading the data set in individual parts (batches) instead of downloading
-the one large zip-file containing all observations at once?
-* The requirement of using zipping/file compression in the task you have just implemented has conse-
-quences for the computational resources needed to run this task. Which hardware component(s) are used more efficiently due to file compression in this task and which ones less efficiently (if any)?
+To load in the csv files we made use of the "vroom" package. The vroom package exploits "lazy loading", whereby indices are created where each record is located instead of reading in the whole data set. Therefore, memory is only consumed once the records are needed. This results in much faster performance compared to alternative packages such as data.table or readr. See https://vroom.r-lib.org/articles/benchmarks.html for benchmark results.
+* What is the advantage of downloading the data set in individual parts (batches) instead of downloading the one large zip-file containing all observations at once?
+Depending on the bandwith your ISP gives you, downloading in batches may proceed faster than downloading one large zip-file. This is especially the case if the download process for the individual parts is parallelized. Furthermore, having individual files gives additional flexibility when loading in only the specific files required for the task vs. all observations (e.g. if the files are split according to year).
+* The requirement of using zipping/file compression in the task you have just implemented has consequences for the computational resources needed to run this task. Which hardware component(s) are used more efficiently due to file compression in this task and which ones less efficiently (if any)?
+Due to their smaller file size, zip files put less pressure on memory components such as RAM and the hard disk. On the other hand, it takes more processing power (CPU) to unzip files compared to having the files already stored in a decompressed format.
 
 
 
@@ -124,7 +124,7 @@ colnames(transactions) <- c("Type", "Description")
 industrycodes <- read.csv("http://assets.transparencydata.org.s3.amazonaws.com/docs/catcodes.csv")
 
 #unzip fec.csv
-R.utils:::gunzip("fec.csv.zip", destname = "fec.csv")
+#R.utils:::gunzip("fec.csv.zip", destname = "fec.csv")
 
 #Create SQLite database called fec.sqlite
 con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
@@ -182,6 +182,12 @@ In the exposition of your solution, explain first why it makes sense to keep the
 ```{r}
 
 # ADD YOUR SOLUTION CODE TO TASK 3 HERE
+
+# set working directory according to who is executing the code
+Paths = c("/Users/jonasschmitten/Downloads/GitHub/take-home-exercises-team-send-it/data",
+          "/Users/noahangara/Documents/GitHub/take-home-exercises-team-send-it/data")
+names(Paths) = c("jonasschmitten", "noahangara")
+setwd(Paths[Sys.info()[7]])
 
 #required libraries
 library(RSQLite)
@@ -252,6 +258,12 @@ kable(top_5_candidates, format = "html")
 
 # ADD YOUR SOLUTION CODE TO TASK 4 HERE
 
+# set working directory according to who is executing the code
+Paths = c("/Users/jonasschmitten/Downloads/GitHub/take-home-exercises-team-send-it/data",
+          "/Users/noahangara/Documents/GitHub/take-home-exercises-team-send-it/data")
+names(Paths) = c("jonasschmitten", "noahangara")
+setwd(Paths[Sys.info()[7]])
+
 #required libraries
 library(RSQLite)
 library(stargazer)
@@ -279,11 +291,9 @@ fixed_reg_data <- fixed_reg_data %>%
 
 #MODEL (1)
 model1 <- felm(total_amount ~ republican, fixed_reg_data)
-summary(model1, robust = T)
 
 #MODEL (2)
 model2 <- felm(total_amount ~ republican | recipient_state |0| recipient_state, fixed_reg_data)
-summary(model2)
 
 #MODEL (3)
 model3 <- felm(total_amount ~ republican | recipient_state + cycle, fixed_reg_data)
