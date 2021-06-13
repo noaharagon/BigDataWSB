@@ -123,8 +123,9 @@ colnames(transactions) <- c("Type", "Description")
 
 industrycodes <- read.csv("http://assets.transparencydata.org.s3.amazonaws.com/docs/catcodes.csv")
 
-#unzip fec.csv
-#R.utils:::gunzip("fec.csv.zip", destname = "fec.csv")
+#unzip fec.csv if it exists (allows to run task 2 multiple times without running task 1 again)
+if (file.exists('fec.csv.zip'))
+   R.utils:::gunzip("fec.csv.zip", destname = "fec.csv")
 
 #Create SQLite database called fec.sqlite
 con <- dbConnect(RSQLite::SQLite(), "fec.sqlite")
@@ -188,6 +189,7 @@ library(dplyr)
 library(ggthemes)
 library(knitr)
 library(reshape2)
+library(kableExtra)
 
 # set working directory according to who is executing the code
 Paths = c("/Users/jonasschmitten/Downloads/GitHub/take-home-exercises-team-send-it/data",
@@ -243,11 +245,13 @@ top_5_candidates <- candidate_donations %>%
   filter(!(recipient_name == "NA")) %>% 
   slice_max(total_amount, n = 5)
 
-kable(top_5_candidates, format = "html")
+kable(top_5_candidates, format = "html", caption = "Top Candidates by Donations from Oil & Gas Industry", col.names = c("Amount ", "Cycle ", "Candidate")) %>%
+  pack_rows(index = table(top_5_candidates$cycle)) %>% kable_styling()
 
 ```
 
 ### Exposition of the solution
+We first queried the needed data via SQLite to not run into local memory issues and because R dataframes are slower than SQL databases. To do this, we queried the required columns in the first step and then ran operations (sum) in the second step. Since the queried data set was manageable in size, we decided to run dplyr.
 
 ## Task 4: Regression analysis
 
