@@ -2,9 +2,8 @@
 title: "Research Report"
 subtitle: "Big Data Analytics Group Examination: Take-Home Exercises"
 author:
-- Author1 (Student ID)
-- Author2 (Student ID)
-- Author3 (Student ID)
+- Jonas Paul Schmitten (20-620-894)
+- Noah Julian Angara (16-604-233)
 date: "14/06/2021"
 output: html_document
 ---
@@ -219,10 +218,12 @@ contribution_plot <- data.frame(
   relative = oil_and_gas %>% group_by(cycle) %>%summarise(absolute = sum(amount))/total_contributions$`SUM (amount)`*100) %>%
   select(c(1,2,4))
 colnames(contribution_plot) <- c("Cycle", "Absolute", "Relative (%)")
-contribution_plot <- melt(contribution_plot, "Cycle")#for proper format into ggplot
+#for proper format into ggplot
+contribution_plot <- melt(contribution_plot, "Cycle")
 
 #create bar plot with relative and absolute donations from OIL & GAS
-options(scipen=999) #removes scientific notation for y-axis
+#removes scientific notation for y-axis
+options(scipen=999) 
 ggplot(data = contribution_plot) + 
   geom_bar(aes(x = Cycle, y = value, fill = variable), stat = "identity", show.legend = FALSE) + 
   facet_grid(variable ~ ., scales='free') + xlab("Cycle") + theme_fivethirtyeight()
@@ -263,6 +264,7 @@ library(dplyr)
 library(knitr)
 library(lfe)
 library(parallel)
+library(sandwich)
 
 # set working directory according to who is executing the code
 Paths = c("/Users/jonasschmitten/Downloads/GitHub/take-home-exercises-team-send-it/data",
@@ -289,8 +291,12 @@ fixed_reg_data <- fixed_reg_data %>%
 
 #MODEL (1)
 model1 <- felm(total_amount ~ republican, fixed_reg_data)
+#calculate robust standard errors
+cov <- vcovHC(model1, type = "HC")
+robust.se <- sqrt(diag(cov))
 
 #MODEL (2)
+#include cluster robust standard errors
 model2 <- felm(total_amount ~ republican | recipient_state |0| recipient_state, fixed_reg_data)
 
 #MODEL (3)
@@ -315,7 +321,6 @@ bootstrap_se <- btrap(
   threads = detectCores(),
   cluster = model3[["cycle"]]
 )
-
 
 #present results in table
 stargazer(model1, model2, model3, header = F, df = F, title = 'Results Fixed Effects Models', align = T, dep.var.labels = 'Amount', 
