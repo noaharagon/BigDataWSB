@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Solution
 
-```{r message=FALSE, warning=FALSE, eval = FALSE}
+```{r message=FALSE, warning=FALSE}
 
 #required libraries
 library(xml2)
@@ -313,41 +313,18 @@ fixed_reg_data <- fixed_reg_data %>%
   select(-recipient_party)
 
 #MODEL (1)
-model1 <- felm(total_amount ~ republican, fixed_reg_data)
-#calculate robust standard errors
-cov <- vcovHC(model1, type = "HC")
-robust.se <- sqrt(diag(cov))
+model1 <- felm(total_amount ~ republican |0|0| recipient_state + cycle, fixed_reg_data)
+
 
 #MODEL (2)
-#include cluster robust standard errors
-model2 <- felm(total_amount ~ republican | recipient_state |0| recipient_state, fixed_reg_data)
+model2 <- felm(total_amount ~ republican | recipient_state |0| recipient_state + cycle, fixed_reg_data)
 
 #MODEL (3)
-model3 <- felm(total_amount ~ republican | recipient_state + cycle, fixed_reg_data)
-
-# set the seed 
-set.seed(12695)
-bootstrap_fe <- getfe(
-  model3,
-  se = FALSE,
-  method = "kaczmarz",
-  ef = "ref",
-  bN = 100,
-  robust = FALSE,
-  cluster = model3[["cycle"]]
-)
-
-bootstrap_se <- btrap(
-  bootstrap_fe,
-  model3,
-  N = 100,
-  threads = detectCores(),
-  cluster = model3[["cycle"]]
-)
+model3 <- felm(total_amount ~ republican | recipient_state + cycle |0| recipient_state + cycle, fixed_reg_data)
 
 #present results in table
 stargazer(model1, model2, model3, header = F, df = F, title = 'Results Fixed Effects Models', align = T, dep.var.labels = 'Amount', 
-          no.space = T, column.labels = c("Model 1", "Model 2", "Model 3"), covariate.labels=c('Republican', 'Intercept'), model.numbers=FALSE, type = 'html')
+          no.space = T, column.labels = c("Model 1", "Model 2", "Model 3"), covariate.labels=c('Republican', 'Intercept'), model.numbers=FALSE, type = 'html', add.lines = list(c("Fixed Effects", "No", "State", "State and Cycle")))
 
 # Disconnect from the database
 dbDisconnect(con)
@@ -361,7 +338,7 @@ To estimate the OLS solution with fixed effects i.e., to demean or remove time-c
 
 * *Extra point:* motivate briefly why you have chosen to use (which type of) cluster-robust standard errors (or why you have chosen not to use cluster-robust standard errors).
 
-We use cluster-robust standard errors to account for the subdivison of the data into smaller groups (i.e. clusters) where the sampling is correlated within each group. This means that we think that, for instance, being a Republican is highly correlated with the State variable given the prevalance of so-called 'red' and 'blue' states in the US. We account for this because the standard errors are most likely smaller than regular OLS standard errors as a result of clustering. Furthermore, observations within groups can be correlated over time, leading to wrong standard errors if not corrected for.
+We use cluster-robust standard errors to account for the subdivision of the data into smaller groups (i.e. clusters) where the sampling is correlated within each group. This means that we think that, for instance, being a Republican is highly correlated with the State variable given the prevalence of so-called 'red' and 'blue' states in the US. We account for this because the standard errors are most likely smaller than regular OLS standard errors as a result of clustering. Furthermore, observations within groups can be correlated over time, leading to wrong standard errors if not corrected for. We decided to include cluster-robust standard errors for both State and Cycle in all models following Abadie et. al (2017) because they show that the inclusion of fixed effects is not sufficient to account for clustering. In addition, we decided not to bootstrap the standard errors with groups less than 50 due to simplicity. The outcomes would not have changed meaningfully regardless.
 
 
 
