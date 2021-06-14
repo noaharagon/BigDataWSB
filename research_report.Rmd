@@ -167,6 +167,9 @@ invisible(dbExecute(con, 'CREATE INDEX index_donation ON donations (amount, cycl
 #show difference in memory usage of an integer vs string
 object.size(42)
 object.size("42")
+
+# Disconnect from the database
+dbDisconnect(con)
 ```
 
 ### Exposition of the solution
@@ -245,6 +248,9 @@ candidate_donations <- dbGetQuery(con, "SELECT SUM(amount) AS total_amount,
                           ON donations.contributor_category = industrycodes.code
                           WHERE industrycodes.industry = 'OIL & GAS' AND recipient_type = 'P' AND amount > 0
                           GROUP BY cycle, recipient_name")
+
+# Disconnect from the database
+dbDisconnect(con)
 
 #get top 5 candidates per election cycle and filter out NA's
 top_5_candidates <- candidate_donations %>% 
@@ -335,7 +341,8 @@ bootstrap_se <- btrap(
 stargazer(model1, model2, model3, header = F, df = F, title = 'Results Fixed Effects Models', align = T, dep.var.labels = 'Amount', 
           no.space = T, column.labels = c("Model 1", "Model 2", "Model 3"), covariate.labels=c('Republican', 'Intercept'), model.numbers=FALSE, type = 'html')
 
-
+# Disconnect from the database
+dbDisconnect(con)
 ```
 
 ### Exposition of the solution
