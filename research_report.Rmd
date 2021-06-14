@@ -20,8 +20,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r message=FALSE, warning=FALSE, eval = FALSE}
 
-# ADD YOUR SOLUTION CODE TO TASK 1 HERE
-
 #required libraries
 library(xml2)
 library(httr)
@@ -103,8 +101,6 @@ Due to their smaller file size, zip files put less pressure on memory components
 
 ```{r message=FALSE, warning=FALSE}
 
-# ADD YOUR SOLUTION CODE TO TASK 2 HERE
-
 #required libraries
 library(RSQLite)
 library(htmltab)
@@ -172,15 +168,23 @@ invisible(dbExecute(con, 'CREATE INDEX index_donation ON donations (amount, cycl
 
 ### Exposition of the solution
 
-In the exposition of your solution, explain first why it makes sense to keep the three data sets in three different tables. Then explain what you did to optimize the database and (in simple terms) why your optimization improves the database in comparison to the same database without any optimization (all columns as TEXT and no indices). Is it faster? Does it use less storage space? why?
+* In the exposition of your solution, explain first why it makes sense to keep the three data sets in three different tables.
+
+It makes sense to keep the data in separate tables to comply with the normal forms of relational database design proposed by Edgar Codd. The purpose of these normal forms is to remove any redundancies or duplicates. If we merge the donations table with the industrycodes and transactiontypes table the keys (e.g. industry code and FEC transaction type) are duplicated, as they are present in all three tables. 
+
+* Then explain what you did to optimize the database and (in simple terms) why your optimization improves the database in comparison to the same database without any optimization (all columns as TEXT and no indices).
+
+To optimize the database we made use of indices and storage classes. Similar to an index at the back of a book, SQLite can find the data quicker with the help of indices, as it does not have to scan the entire table but rather specific columns (although we do compromise on storage space). Storage classes can be used to optimize the amount of disk space used by the columns. For example, storing the number 42 as text requires 112 bytes, while storing it as an integer would only require 56 bytes. This is because integers are between 2 and 8 bytes in size (usually 2 bytes if between -32'768 and 32'768), while text is at least 4 bytes + the number of characters. 
+
+* Is it faster? Does it use less storage space? why?
+
+Using the sqlite3_analyzer.exe downloaded from https://www.sqlite.org/sqlanalyze.html we can compare the storage size of the donations table with and without specifying the storage class. Specifying the storage classes of cycle and amount results in a size of 1'422'925'824 bytes vs. 1'518'264'320 bytes without specifying the storage class. Furthermore, we can time a simple query with and without using indices. Without indices the first query in task 3 took 5.97 minutes, while it only took 41 seconds with indices.
 
 ## Task 3: Data aggregation and visualization
 
 ### Solution
 
 ```{r message=FALSE, warning=FALSE, results= 'asis'}
-
-# ADD YOUR SOLUTION CODE TO TASK 3 HERE
 
 #required libraries
 library(RSQLite)
@@ -259,8 +263,6 @@ We first queried the needed data via SQLite to not run into local memory issues 
 
 ```{r message=FALSE, warning=FALSE, results='asis'}
 
-# ADD YOUR SOLUTION CODE TO TASK 4 HERE
-
 #required libraries
 library(RSQLite)
 library(stargazer)
@@ -336,6 +338,8 @@ stargazer(model1, model2, model3, header = F, df = F, title = 'Results Fixed Eff
 ### Exposition of the solution
 
 * From what we discussed in the lectures and from what you take from (Gaure 2013), why might the traditional approach to estimate specifications 2 and 3 (with sets of dummy variables for the fixed effects) with OLS (lm-function) be computationally more demanding than the approach implemented in the lfe-package?
+To estimate the OLS solution with fixed effects i.e., to demean or remove time-constant effects in the category we have to deal with an $nxn$ matrix $P$, which is a projection on the orthogonal complement of the column space of the dummy variable matrix $D$. However, instead of dealing with the entire matrix $P$ as the lm() function most likely does, Gaure (2013) shows that the matrix can be split into column vectors $P_ix$ according to each factor $i$ in the fixed effects model, making the task computationally less demanding. By parallelizing the computation of the vectors and using more cores the task can be performed more efficiently.
+
 * *Extra point:* motivate briefly why you have chosen to use (which type of) cluster-robust standard errors (or why you have chosen not to use cluster-robust standard errors).
 
 
