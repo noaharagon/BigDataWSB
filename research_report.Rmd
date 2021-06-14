@@ -28,6 +28,7 @@ library(dplyr)
 library(readr)
 library(vroom)
 library(parallel)
+library(pryr)
 library(R.utils)
 library(data.table)
 
@@ -74,6 +75,9 @@ for (i in files) {
   fwrite(d, "fec.csv", nThread = detectCores(), sep = "\t", quote = F, append = !first, na = NA)
 }
 ending <- Sys.time()
+
+#keep track of memory used
+mem_used()
 
 #compress csv file and remove redundant files
 #RUNTIME: ~3.5 minutes on Macbook Air 2017 i7 8GB RAM
@@ -141,7 +145,7 @@ dbWriteTable(con, "industrycodes", industrycodes, overwrite = T, field.types = c
 
 #Create table for donations
 #RUNTIME: ~1.65 minutes on Macbook Air 2017 i7 8GB RAM & 4 cores
-beginning <- Sys.time()
+beginning_query <- Sys.time()
 dbWriteTable(con, "donations", "fec.csv", sep = "\t", overwrite = T, field.types = c(
   cycle = "int",
   amount = "real",
@@ -152,7 +156,7 @@ dbWriteTable(con, "donations", "fec.csv", sep = "\t", overwrite = T, field.types
   recipient_type = "varchar(3)",
   transaction_type = "varchar(3)"
 ))
-end <- Sys.time()
+end_query <- Sys.time()
 
 #Create index for those variables needed in later analysis (makes retrieval more efficient)
 #For transaction type data
@@ -184,7 +188,7 @@ To optimize the database we made use of indices and storage classes. Similar to 
 
 * Is it faster? Does it use less storage space? why?
 
-Using the sqlite3_analyzer.exe downloaded from https://www.sqlite.org/sqlanalyze.html we can compare the storage size of the donations table with and without specifying the storage class. Specifying the storage classes of cycle and amount results in a size of 1'422'925'824 bytes vs. 1'518'264'320 bytes without specifying the storage class. Furthermore, we can time a simple query with and without using indices. Without indices the first query in task 3 took 5.97 minutes, while it only took 41 seconds with indices.
+Using the sqlite3_analyzer.exe downloaded from https://www.sqlite.org/sqlanalyze.html and running "sqlite3_analyzer /Users/noahangara/Documents/GitHub/take-home-exercises-team-send-it/data/fec.sqlite" from the terminal we can compare the storage size of the donations table with and without specifying the storage class. Specifying the storage classes of cycle and amount results in a size of 1'422'925'824 bytes vs. 1'518'264'320 bytes without specifying the storage class. Furthermore, we can time a simple query with and without using indices. Without indices the first query in task 3 took 5.97 minutes, while it only took 41 seconds with indices.
 
 ## Task 3: Data aggregation and visualization
 
@@ -223,6 +227,9 @@ total_contributions <- dbGetQuery(con, "SELECT cycle,
                                   SUM (amount) 
                                   FROM donations
                                   GROUP BY cycle")
+
+#get memory size of to see if it is manageable with dplyr
+print(c(object.size(oil_and_gas), object.size(total_contributions)))
 
 #data cleaning dataframe with total and relative contributions
 contribution_plot <- data.frame(
@@ -349,10 +356,12 @@ dbDisconnect(con)
 ### Exposition of the solution
 
 * From what we discussed in the lectures and from what you take from (Gaure 2013), why might the traditional approach to estimate specifications 2 and 3 (with sets of dummy variables for the fixed effects) with OLS (lm-function) be computationally more demanding than the approach implemented in the lfe-package?
+
 To estimate the OLS solution with fixed effects i.e., to demean or remove time-constant effects in the category we have to deal with an $nxn$ matrix $P$, which is a projection on the orthogonal complement of the column space of the dummy variable matrix $D$. However, instead of dealing with the entire matrix $P$ as the lm() function most likely does, Gaure (2013) shows that the matrix can be split into column vectors $P_ix$ according to each factor $i$ in the fixed effects model, making the task computationally less demanding. By parallelizing the computation of the vectors and using more cores the task can be performed more efficiently.
 
 * *Extra point:* motivate briefly why you have chosen to use (which type of) cluster-robust standard errors (or why you have chosen not to use cluster-robust standard errors).
 
+We use cluster-robust standard errors to account for the subdivison of the data into smaller groups (i.e. clusters) where the sampling is correlated within each group. This means that we think that, for instance, being a Republican is highly correlated with the State variable given the prevalance of so-called 'red' and 'blue' states in the US. We account for this because the standard errors are most likely smaller than regular OLS standard errors as a result of clustering. Furthermore, observations within groups can be correlated over time, leading to wrong standard errors if not corrected for.
 
 
 
