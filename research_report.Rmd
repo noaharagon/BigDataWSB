@@ -258,6 +258,7 @@ top_5_candidates <- candidate_donations %>%
   filter(!(recipient_name == "NA")) %>% 
   slice_max(total_amount, n = 5)
 
+#create table with top 5 candidates per election cycle
 kable(top_5_candidates, format = "html", caption = "Top Candidates by Donations from Oil & Gas Industry", col.names = c("Amount ", "Cycle ", "Candidate")) %>%
   pack_rows(index = table(top_5_candidates$cycle)) %>% kable_styling()
 
