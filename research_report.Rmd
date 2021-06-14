@@ -164,6 +164,9 @@ invisible(dbExecute(con, 'CREATE INDEX index_industry ON industrycodes (source, 
 #For transaction data
 invisible(dbExecute(con, 'CREATE INDEX index_donation ON donations (amount, cycle, contributor_category, recipient_party, recipient_name, recipient_state, recipient_type);'))
 
+#show difference in memory usage of an integer vs string
+object.size(42)
+object.size("42")
 ```
 
 ### Exposition of the solution
