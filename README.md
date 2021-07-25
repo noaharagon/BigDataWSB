@@ -15,4 +15,4 @@ Slides are stored under Schmitten, Angara Big Data WSB Sentiment Analysis.pdf
 
 ## Summary
 * Sentiment analysis of WSB comments and backtesting an investment strategy based on sentiment/mentions
-* Executed via AWS EC2
+* Executed via AWS Elastic Computing (EC2)
