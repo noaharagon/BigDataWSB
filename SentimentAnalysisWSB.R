@@ -36,10 +36,10 @@ Sys.setenv("AWS_ACCESS_KEY_ID" = "",
            "AWS_DEFAULT_REGION" = "")
 
 #Read in Data from Amazon S3 Bucket
-stock_tickers = aws.s3::s3read_using(read.csv, object = "s3://noahangara/stock_tickers.csv")
+stock_tickers = aws.s3::s3read_using(read.csv, object = "")
 stock_tickers = stock_tickers[stock_tickers$Market.Cap>1000000000,]
 
-data = aws.s3::s3read_using(read_csv, object = "s3://noahangara/wsb_comments_raw.csv")
+data = aws.s3::s3read_using(read_csv, object = "")
 
 
 
