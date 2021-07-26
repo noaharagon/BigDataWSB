@@ -6,6 +6,7 @@
 * Repo for the course "Big Data Analytics", which consists of a group project and take home exercises
 * Group Project: Sentiment analysis of WSB comments and backtesting an investment strategy based on sentiment/mentions using Amazon Web Services (EC2)
 * Take Home Exercises: Analyze a large collection of FEC Data using big data strategies from class
+* For security reasons, the code is not in a fully reproducible format (e.g. exclude Amazon access keys)
 
 # Repository structure
 
