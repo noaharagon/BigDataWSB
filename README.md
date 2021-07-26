@@ -1,14 +1,14 @@
-# Big Data Analytics: Group Project/Presentation
+# Big Data Analytics: Group Project and Take Home Exercises
 
 ## Authors: Jonas Schmitten & Noah Angara
 
 # Repository structure
 
 ## Code
-All of the project code is stored in the SentimentAnalysisWSB.R file
+All of the project code is stored in the SentimentAnalysisWSB.R file. The code for the take home exercises is in 
 
 ## Data
-We use the WSB comments data set from kaggle under https://www.kaggle.com/mattpodolak/reddit-wallstreetbets-comments
+We use the WSB comments data set from kaggle under `https://www.kaggle.com/mattpodolak/reddit-wallstreetbets-comments`. To match posts to stock tickers we downloaded the csv from `https://datahub.io/core/nyse-other-listings
 
 ## Presentation Slides
 Slides are stored under Schmitten, Angara Big Data WSB Sentiment Analysis.pdf
